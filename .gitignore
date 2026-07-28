@@ -1,0 +1,33 @@
+# OS / IDE
+.DS_Store
+.cursor/
+.idea/
+.vscode/
+*.swp
+
+# Secrets (never commit)
+.env
+.env.*
+!.env.example
+!.env.production.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/venv/
+**/.venv/
+**/env/
+
+# Flutter / Dart build caches (FRONTEND/.gitignore also covers these)
+FRONTEND/build/
+FRONTEND/.dart_tool/
+FRONTEND/.flutter-plugins-dependencies
+
+# Backups / dumps
+*.dump
+*.dump.gz
+backups/

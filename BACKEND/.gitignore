@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+schema.yml
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Certs
+docker/certs/*.pem
+docker/certs/*.key
+!docker/certs/.gitkeep
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Tests / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Backups
+backups/
+*.dump
+*.dump.gz

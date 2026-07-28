@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+.venv/
+*.egg-info/
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Tests / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+tests/
+**/tests/
+
+# Docs (not needed in image)
+*.md

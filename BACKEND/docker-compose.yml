@@ -1,0 +1,120 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: wanti-postgres
+    environment:
+      POSTGRES_DB: wanti_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: wanti-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wanti-api
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/home/app/code
+      - static_volume:/home/app/code/staticfiles
+      - media_volume:/home/app/code/media
+    ports:
+      - "8000:8000"
+    environment:
+      DJANGO_SETTINGS_MODULE: app.settings.local
+      RUN_MIGRATIONS: "true"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: wanti_db
+      DATABASE_URL: postgis://postgres:postgres@postgres:5432/wanti_db
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-worker:
+    build: .
+    container_name: wanti-celery-worker
+    command: >
+      celery -A app worker
+      --loglevel=info
+      --queues=high,default,low
+      --concurrency=4
+      --max-tasks-per-child=1000
+      --time-limit=300
+      --soft-time-limit=240
+    volumes:
+      - .:/home/app/code
+    environment:
+      DJANGO_SETTINGS_MODULE: app.settings.local
+      RUN_MIGRATIONS: "false"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DATABASE_URL: postgis://postgres:postgres@postgres:5432/wanti_db
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build: .
+    container_name: wanti-celery-beat
+    command: >
+      celery -A app beat
+      --loglevel=info
+      --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/home/app/code
+    environment:
+      DJANGO_SETTINGS_MODULE: app.settings.local
+      RUN_MIGRATIONS: "false"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DATABASE_URL: postgis://postgres:postgres@postgres:5432/wanti_db
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  static_volume:
+  media_volume:
