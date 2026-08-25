@@ -64,11 +64,19 @@ class SellerMatchCard extends StatelessWidget {
     super.key,
     required this.match,
     this.onTap,
+    this.onUnlock,
+    this.onOpenLead,
+    this.onDiscard,
+    this.unlocking = false,
     this.compact = false,
   });
 
   final MatchModel match;
   final VoidCallback? onTap;
+  final VoidCallback? onUnlock;
+  final VoidCallback? onOpenLead;
+  final VoidCallback? onDiscard;
+  final bool unlocking;
   final bool compact;
 
   @override
@@ -77,11 +85,12 @@ class SellerMatchCard extends StatelessWidget {
     final accent = high ? WantiColors.teal : WantiColors.warning;
     final buyer = match.buyer;
     final title = match.needTitle ?? 'Búsqueda de comprador';
+    final unlocked = match.alreadyUnlocked;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: unlocked ? onOpenLead : onTap,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
@@ -90,48 +99,123 @@ class SellerMatchCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: accent, width: 1.4),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              MatchPercentLabel(score: match.score),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title.startsWith('Busca') ? title : 'Busca $title',
-                      style: GoogleFonts.nunito(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: WantiColors.ink,
-                      ),
-                    ),
-                    if (!compact && buyer != null) ...[
-                      const SizedBox(height: 4),
-                      if (buyer.isNewUser)
-                        PreferenceChip(label: 'Usuario nuevo', accent: WantiColors.warning)
-                      else
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  MatchPercentLabel(score: match.score),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          '${buyer.fullName.split(' ').take(2).join(' ')}'
-                          '${buyer.ratingAverage != null ? ' ★ ${buyer.ratingAverage!.toStringAsFixed(1)}' : ''}',
+                          title.startsWith('Busca') ? title : 'Busca $title',
                           style: GoogleFonts.nunito(
-                            fontSize: 13,
-                            color: WantiColors.inkMuted,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: WantiColors.ink,
                           ),
                         ),
-                    ],
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: match.sellerAlertTags
-                          .map((t) => PreferenceChip(label: t))
-                          .toList(),
+                        if (!compact && buyer != null) ...[
+                          const SizedBox(height: 4),
+                          if (buyer.isNewUser)
+                            PreferenceChip(label: 'Usuario nuevo', accent: WantiColors.warning)
+                          else
+                            Text(
+                              '${buyer.fullName.split(' ').take(2).join(' ')}'
+                              '${buyer.ratingAverage != null ? ' ★ ${buyer.ratingAverage!.toStringAsFixed(1)}' : ''}',
+                              style: GoogleFonts.nunito(
+                                fontSize: 13,
+                                color: WantiColors.inkMuted,
+                              ),
+                            ),
+                        ],
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: match.sellerAlertTags
+                              .map((t) => PreferenceChip(label: t))
+                              .toList(),
+                        ),
+                      ],
                     ),
+                  ),
+                  if (unlocked)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: WantiColors.surfaceTeal,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Lead',
+                        style: GoogleFonts.nunito(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: WantiColors.tealDark,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              if (onUnlock != null || onOpenLead != null || onDiscard != null) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    if (onUnlock != null || onOpenLead != null)
+                      Expanded(
+                        child: SizedBox(
+                          height: 44,
+                          child: ElevatedButton.icon(
+                            onPressed: unlocking
+                                ? null
+                                : unlocked
+                                    ? onOpenLead
+                                    : onUnlock,
+                            icon: Icon(
+                              unlocked
+                                  ? Icons.person_search_rounded
+                                  : Icons.lock_outline_rounded,
+                              size: 18,
+                            ),
+                            label: Text(
+                              unlocking
+                                  ? 'Desbloqueando...'
+                                  : unlocked
+                                      ? 'Ver lead y contacto'
+                                      : 'Desbloquear — ${match.unlockCostWantis} Wanti',
+                              style: GoogleFonts.nunito(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: unlocked
+                                  ? const Color(0xFF25D366)
+                                  : (high ? WantiColors.navy : WantiColors.warning),
+                              foregroundColor: Colors.white,
+                              disabledBackgroundColor: WantiColors.border,
+                              elevation: 0,
+                              shape: const StadiumBorder(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    if (!unlocked && onDiscard != null) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: 'Descartar',
+                        onPressed: unlocking ? null : onDiscard,
+                        icon: const Icon(Icons.close_rounded, color: WantiColors.inkFaint),
+                      ),
+                    ],
                   ],
                 ),
-              ),
+              ],
             ],
           ),
         ),
@@ -144,14 +228,16 @@ class BuyerMatchCard extends StatelessWidget {
   const BuyerMatchCard({
     super.key,
     required this.match,
-    required this.onUnlock,
+    this.onUnlock,
     this.onOpenUnlocked,
+    this.onDiscard,
     this.unlocking = false,
   });
 
   final MatchModel match;
   final VoidCallback? onUnlock;
   final VoidCallback? onOpenUnlocked;
+  final VoidCallback? onDiscard;
   final bool unlocking;
 
   @override
@@ -274,39 +360,52 @@ class BuyerMatchCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: unlocking
-                      ? null
-                      : match.alreadyUnlocked
-                          ? onOpenUnlocked
-                          : onUnlock,
-                  icon: Icon(
-                    match.alreadyUnlocked
-                        ? Icons.chat_rounded
-                        : Icons.lock_outline_rounded,
-                    size: 18,
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 48,
+                      child: ElevatedButton.icon(
+                        onPressed: unlocking
+                            ? null
+                            : match.alreadyUnlocked
+                                ? onOpenUnlocked
+                                : null,
+                        icon: Icon(
+                          match.alreadyUnlocked
+                              ? Icons.chat_rounded
+                              : Icons.hourglass_empty_rounded,
+                          size: 18,
+                        ),
+                        label: Text(
+                          unlocking
+                              ? 'Desbloqueando...'
+                              : match.alreadyUnlocked
+                                  ? 'Ver ítem y contactar'
+                                  : 'Esperando desbloqueo del vendedor',
+                          style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 13),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: match.alreadyUnlocked
+                              ? const Color(0xFF25D366)
+                              : WantiColors.inkFaint,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: WantiColors.border,
+                          elevation: 0,
+                          shape: const StadiumBorder(),
+                        ),
+                      ),
+                    ),
                   ),
-                  label: Text(
-                    unlocking
-                        ? 'Desbloqueando...'
-                        : match.alreadyUnlocked
-                            ? 'Ver ítem y contactar'
-                            : 'Desbloquear — ${match.unlockCostWantis} Wanti',
-                    style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: match.alreadyUnlocked
-                        ? const Color(0xFF25D366)
-                        : (high ? WantiColors.navy : WantiColors.warning),
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: WantiColors.border,
-                    elevation: 0,
-                    shape: const StadiumBorder(),
-                  ),
-                ),
+                  if (!match.alreadyUnlocked && onDiscard != null) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Descartar',
+                      onPressed: unlocking ? null : onDiscard,
+                      icon: const Icon(Icons.close_rounded, color: WantiColors.inkFaint),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),

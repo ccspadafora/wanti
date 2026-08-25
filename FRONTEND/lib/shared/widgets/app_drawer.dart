@@ -18,7 +18,7 @@ class AppDrawer extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: Text('Cerrar sesión', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
         content: Text(
-          '¿Querés salir de tu cuenta en este dispositivo?',
+          '¿Quieres salir de tu cuenta en este dispositivo?',
           style: GoogleFonts.nunito(),
         ),
         actions: [
@@ -60,148 +60,207 @@ class AppDrawer extends StatelessWidget {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: WantiColors.surfaceTeal,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 26,
-                      backgroundColor: WantiColors.navy,
-                      backgroundImage: (user?.profilePhotoUrl != null &&
-                              user!.profilePhotoUrl!.isNotEmpty)
-                          ? NetworkImage(user.profilePhotoUrl!)
-                          : null,
-                      child: (user?.profilePhotoUrl == null || user!.profilePhotoUrl!.isEmpty)
-                          ? Text(
-                              initialsOf(user?.fullName ?? '?'),
-                              style: GoogleFonts.nunito(
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                                fontSize: 18,
-                              ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: ListView(
+                padding: EdgeInsets.zero,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: WantiColors.surfaceTeal,
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
                         children: [
-                          Text(
-                            user?.fullName ?? '',
-                            style: GoogleFonts.nunito(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                              color: WantiColors.ink,
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: WantiColors.navy,
+                            backgroundImage: (user?.profilePhotoUrl != null &&
+                                    user!.profilePhotoUrl!.isNotEmpty)
+                                ? NetworkImage(user.profilePhotoUrl!)
+                                : null,
+                            child: (user?.profilePhotoUrl == null ||
+                                    user!.profilePhotoUrl!.isEmpty)
+                                ? Text(
+                                    initialsOf(user?.fullName ?? '?'),
+                                    style: GoogleFonts.nunito(
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user?.fullName ?? '',
+                                  style: GoogleFonts.nunito(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                    color: WantiColors.ink,
+                                  ),
+                                ),
+                                Text(
+                                  user?.email ?? '',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12,
+                                    color: WantiColors.inkMuted,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (user?.city != null && user!.city.isNotEmpty)
+                                  Text(
+                                    user.city,
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 12,
+                                      color: WantiColors.inkFaint,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
-                          Text(
-                            user?.email ?? '',
-                            style: GoogleFonts.nunito(
-                              fontSize: 12,
-                              color: WantiColors.inkMuted,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (user?.city != null && user!.city.isNotEmpty)
-                            Text(
-                              user.city,
-                              style: GoogleFonts.nunito(
-                                fontSize: 12,
-                                color: WantiColors.inkFaint,
-                              ),
-                            ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-              child: Text(
-                'Modo de uso',
-                style: GoogleFonts.nunito(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13,
-                  color: WantiColors.inkMuted,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _ModeTile(
-                      label: 'Comprador',
-                      icon: Icons.shopping_bag_outlined,
-                      selected: mode.isBuyer,
-                      onTap: () {
-                        mode.setMode(AppMode.buyer);
-                        Navigator.of(context).pop();
-                      },
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+                    child: Text(
+                      'Modo de uso',
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: WantiColors.inkMuted,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _ModeTile(
-                      label: 'Vendedor',
-                      icon: Icons.storefront_outlined,
-                      selected: mode.isSeller,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _ModeTile(
+                            label: 'Comprar',
+                            icon: Icons.shopping_bag_outlined,
+                            selected: mode.isBuyer,
+                            onTap: () {
+                              mode.setMode(AppMode.buyer);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _ModeTile(
+                            label: 'Vender',
+                            icon: Icons.storefront_outlined,
+                            selected: mode.isSeller,
+                            onTap: () {
+                              mode.setMode(AppMode.seller);
+                              Navigator.of(context).pop();
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: WantiColors.borderLight),
+                  _DrawerTile(
+                    icon: Icons.person_outline_rounded,
+                    label: 'Mi perfil',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/profile');
+                    },
+                  ),
+                  _DrawerTile(
+                    icon: Icons.location_city_outlined,
+                    label: 'Editar ciudad',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/profile/edit');
+                    },
+                  ),
+                  _DrawerTile(
+                    icon: Icons.lock_outline_rounded,
+                    label: 'Cambiar contraseña',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/profile/change-password');
+                    },
+                  ),
+                  if (mode.isSeller)
+                    _DrawerTile(
+                      icon: Icons.account_balance_wallet_outlined,
+                      label: 'Mi Wallet',
                       onTap: () {
-                        mode.setMode(AppMode.seller);
                         Navigator.of(context).pop();
+                        context.push('/wallet');
                       },
                     ),
+                  if (mode.isBuyer)
+                    _DrawerTile(
+                      icon: Icons.contacts_outlined,
+                      label: 'Mis contactos',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/contacts');
+                      },
+                    ),
+                  if (mode.isSeller)
+                    _DrawerTile(
+                      icon: Icons.handshake_outlined,
+                      label: 'Mis contactos comprados',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/leads');
+                      },
+                    ),
+                  if (mode.isSeller)
+                    _DrawerTile(
+                      icon: Icons.person_search_rounded,
+                      label: 'Contactos desbloqueados',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/contacts/purchasers');
+                      },
+                    ),
+                  if (mode.isSeller)
+                    _DrawerTile(
+                      icon: Icons.travel_explore_rounded,
+                      label: 'Explorar sueños',
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        context.push('/needs/browse');
+                      },
+                    ),
+                  _DrawerTile(
+                    icon: Icons.gavel_outlined,
+                    label: 'Disputas',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/disputes');
+                    },
+                  ),
+                  _DrawerTile(
+                    icon: Icons.notifications_none_rounded,
+                    label: 'Notificaciones',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/notifications');
+                    },
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
-            const Divider(height: 1, color: WantiColors.borderLight),
-            _DrawerTile(
-              icon: Icons.person_outline_rounded,
-              label: 'Mi perfil',
-              onTap: () {
-                Navigator.of(context).pop();
-                context.push('/profile');
-              },
-            ),
-            _DrawerTile(
-              icon: Icons.edit_outlined,
-              label: 'Editar datos',
-              onTap: () {
-                Navigator.of(context).pop();
-                context.push('/profile/edit');
-              },
-            ),
-            _DrawerTile(
-              icon: Icons.lock_outline_rounded,
-              label: 'Cambiar contraseña',
-              onTap: () {
-                Navigator.of(context).pop();
-                context.push('/profile/change-password');
-              },
-            ),
-            if (mode.isSeller)
-              _DrawerTile(
-                icon: Icons.handshake_outlined,
-                label: 'Mis leads',
-                onTap: () {
-                  Navigator.of(context).pop();
-                  context.push('/leads');
-                },
-              ),
-            const Spacer(),
             const Divider(height: 1, color: WantiColors.borderLight),
             _DrawerTile(
               icon: Icons.logout_rounded,

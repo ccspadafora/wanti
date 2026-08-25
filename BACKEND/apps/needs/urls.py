@@ -8,10 +8,12 @@ from apps.needs.views import (
     NeedPublishView,
     NeedRenewView,
     NeedResumeView,
+    NeedSearchView,
 )
 
 urlpatterns = [
     path('', NeedListCreateView.as_view(), name='need-list-create'),
+    path('search/', NeedSearchView.as_view(), name='need-search'),
     path('<uuid:id>/', NeedDetailView.as_view(), name='need-detail'),
     path('<uuid:id>/publish/', NeedPublishView.as_view(), name='need-publish'),
     path('<uuid:id>/pause/', NeedPauseView.as_view(), name='need-pause'),

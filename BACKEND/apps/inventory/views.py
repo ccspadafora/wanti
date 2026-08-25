@@ -31,10 +31,22 @@ class InventoryListCreateView(APIView):
         qs = list_own_inventory(request.user)
         asset_type = request.query_params.get('asset_type')
         item_status = request.query_params.get('status')
+        brand = request.query_params.get('brand')
+        model = request.query_params.get('model')
+        vehicle_category = request.query_params.get('vehicle_category')
+        property_type = request.query_params.get('property_type')
         if asset_type:
             qs = qs.filter(asset_type=asset_type)
         if item_status:
             qs = qs.filter(status=item_status)
+        if brand:
+            qs = qs.filter(vehicle__brand__iexact=brand.strip())
+        if model:
+            qs = qs.filter(vehicle__model__iexact=model.strip())
+        if vehicle_category:
+            qs = qs.filter(vehicle__vehicle_category=vehicle_category)
+        if property_type:
+            qs = qs.filter(property__property_type=property_type)
         return Response(InventoryListSerializer(qs, many=True).data)
 
     def post(self, request):

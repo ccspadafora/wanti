@@ -6,11 +6,12 @@ class LeadsRepository {
 
   final ApiClient _api;
 
-  Future<List<LeadModel>> list({String? stage}) async {
+  Future<List<LeadModel>> list({String? stage, String? q}) async {
     final data = await _api.get(
       '/leads/',
       query: {
         if (stage != null && stage != 'ALL') 'stage': stage,
+        if (q != null && q.trim().isNotEmpty) 'q': q.trim(),
       },
     );
     final list = data['results'] is List ? data['results'] as List : const [];
@@ -18,6 +19,11 @@ class LeadsRepository {
         .whereType<Map>()
         .map((e) => LeadModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+  Future<LeadModel> detail(String id) async {
+    final data = await _api.get('/leads/$id/');
+    return LeadModel.fromJson(data);
   }
 
   Future<LeadModel> changeStage(String id, String stage, {double? soldPrice}) async {
@@ -31,7 +37,13 @@ class LeadsRepository {
     return LeadModel.fromJson(data);
   }
 
-  Future<void> addNote(String id, String text) async {
-    await _api.post('/leads/$id/notes/', body: {'text': text});
+  Future<LeadNoteModel> addNote(String id, String text) async {
+    final data = await _api.post('/leads/$id/notes/', body: {'text': text});
+    return LeadNoteModel.fromJson(data);
+  }
+
+  Future<List<LeadNoteModel>> listNotes(String id) async {
+    final lead = await detail(id);
+    return lead.notes;
   }
 }

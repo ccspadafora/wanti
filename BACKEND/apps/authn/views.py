@@ -60,6 +60,11 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = register_user(serializer.to_service_data(), ip_address=_client_ip(request))
+        next_step = 'verify_email'
+        if user.email_verified_at and not user.phone_verified_at:
+            next_step = 'verify_phone'
+        elif user.is_fully_verified:
+            next_step = 'home'
         payload = {
             'id': str(user.id),
             'email': user.email,
@@ -67,7 +72,7 @@ class RegisterView(APIView):
             'status': user.status,
             'email_verified_at': user.email_verified_at,
             'phone_verified_at': user.phone_verified_at,
-            'next_step': 'verify_email',
+            'next_step': next_step,
         }
         if settings.DEBUG:
             token = (
@@ -180,10 +185,12 @@ class PasswordResetRequestView(APIView):
     def post(self, request):
         serializer = PasswordResetRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        request_password_reset(
+        token = request_password_reset(
             serializer.validated_data['email'],
             ip_address=_client_ip(request),
         )
+        if settings.DEBUG and token:
+            return Response({'debug_token': token})
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

@@ -31,3 +31,11 @@ FRONTEND/.flutter-plugins-dependencies
 *.dump
 *.dump.gz
 backups/
+
+# Deploy keys
+wanti.pem
+*.pem
+!BACKEND/docker/certs/.gitkeep
+
+# Local catalog dumps (imported via CSV in apps/catalog)
+catalogo_vehiculos_colombia_masivo.*

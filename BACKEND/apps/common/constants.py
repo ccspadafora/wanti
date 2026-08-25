@@ -26,8 +26,13 @@ class AssetType(models.TextChoices):
 
 
 class VehicleCategory(models.TextChoices):
-    MOTO = 'MOTO', 'Moto'
-    CAR = 'CAR', 'Automóvil / Camioneta'
+    CAR = 'CAR', 'Carros'
+    SUV = 'SUV', 'Camionetas'
+    MOTO = 'MOTO', 'Motos'
+    COLLECTION = 'COLLECTION', 'Carros de colección'
+    TRUCK = 'TRUCK', 'Camiones'
+    NAUTICAL = 'NAUTICAL', 'Náutica'
+    HEAVY_MACHINERY = 'HEAVY_MACHINERY', 'Maquinaria pesada'
     OTHER = 'OTHER', 'Otros vehículos'
 
 
@@ -100,6 +105,7 @@ class TopupStatus(models.TextChoices):
     PENDING = 'PENDING', 'Pendiente'
     COMPLETED = 'COMPLETED', 'Completada'
     FAILED = 'FAILED', 'Fallida'
+    CANCELLED = 'CANCELLED', 'Cancelada'
     REFUNDED = 'REFUNDED', 'Reembolsada'
 
 
@@ -112,11 +118,31 @@ class ContactOutcome(models.TextChoices):
 
 
 class DisputeReason(models.TextChoices):
+    # Vendedor (quien gasta Wanti) → disputa de contacto / reembolso
+    BUYER_CONTACT_INVALID = 'BUYER_CONTACT_INVALID', 'El contacto del comprador es inválido'
+    BUYER_NO_RESPONSE = 'BUYER_NO_RESPONSE', 'El comprador no responde'
+    SPAM_OR_ABUSE = 'SPAM_OR_ABUSE', 'Lead spam, abuso o mala fe'
+    FALSE_NEED = 'FALSE_NEED', 'La búsqueda no es real o tiene datos falsos'
+    # Legacy buyer-contact reasons (ya no se usan para abrir, se mantienen por historial)
     CONTACT_INVALID = 'CONTACT_INVALID', 'El contacto no existe o es inválido'
     NO_RESPONSE = 'NO_RESPONSE', 'El vendedor no responde'
     ASSET_UNAVAILABLE = 'ASSET_UNAVAILABLE', 'El bien ya no está disponible'
-    FALSE_INFO = 'FALSE_INFO', 'Información falsa o engaños'
+    FALSE_INFO = 'FALSE_INFO', 'Información falsa o engañosa'
     OTHER = 'OTHER', 'Otro motivo'
+
+
+# Solo el vendedor (pagador de Wanti) abre disputas de contacto/reembolso.
+SELLER_DISPUTE_REASONS = {
+    DisputeReason.BUYER_CONTACT_INVALID,
+    DisputeReason.BUYER_NO_RESPONSE,
+    DisputeReason.SPAM_OR_ABUSE,
+    DisputeReason.FALSE_NEED,
+    DisputeReason.OTHER,
+}
+
+# Comprador no abre disputas de Wanti; solo reseñas (otro módulo).
+BUYER_DISPUTE_REASONS = set()
+
 
 
 class DisputeStatus(models.TextChoices):

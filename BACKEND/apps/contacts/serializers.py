@@ -9,6 +9,7 @@ class ContactPartySerializer(serializers.Serializer):
     id = serializers.UUIDField()
     full_name = serializers.CharField()
     phone = serializers.CharField(allow_null=True, required=False)
+    email = serializers.EmailField(allow_null=True, required=False)
     rating_average = serializers.FloatField(allow_null=True)
     is_new_user = serializers.BooleanField()
 
@@ -25,7 +26,8 @@ class ContactUnlockInventorySerializer(serializers.Serializer):
 
 
 class ContactUnlockSerializer(serializers.ModelSerializer):
-    seller = ContactPartySerializer(read_only=True)
+    seller = serializers.SerializerMethodField()
+    buyer = serializers.SerializerMethodField()
     inventory_item = serializers.SerializerMethodField()
     match_id = serializers.UUIDField(read_only=True)
     score = serializers.SerializerMethodField()
@@ -39,6 +41,7 @@ class ContactUnlockSerializer(serializers.ModelSerializer):
             'match_id',
             'score',
             'seller',
+            'buyer',
             'inventory_item',
             'wantis_charged',
             'outcome',
@@ -48,6 +51,24 @@ class ContactUnlockSerializer(serializers.ModelSerializer):
             'can_open_dispute',
             'review_pending',
         )
+
+    def _party(self, user):
+        return ContactPartySerializer(
+            {
+                'id': user.id,
+                'full_name': user.full_name,
+                'phone': user.phone,
+                'email': user.email,
+                'rating_average': user.rating_average,
+                'is_new_user': user.is_new_user,
+            }
+        ).data
+
+    def get_seller(self, obj):
+        return self._party(obj.seller)
+
+    def get_buyer(self, obj):
+        return self._party(obj.buyer)
 
     def get_score(self, obj):
         return obj.match.score
@@ -74,7 +95,8 @@ class ContactUnlockSerializer(serializers.ModelSerializer):
         return ContactUnlockInventorySerializer(data).data
 
     def get_can_open_dispute(self, obj):
-        return not obj.disputes.filter(
+        request = self.context.get('request')
+        active = obj.disputes.filter(
             status__in=[
                 DisputeStatus.OPEN,
                 DisputeStatus.AUTO_REVIEW,
@@ -82,6 +104,15 @@ class ContactUnlockSerializer(serializers.ModelSerializer):
                 DisputeStatus.APPEALED,
             ]
         ).exists()
+        if active:
+            return False
+        if not request or not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return False
+        # Solo quien gastó Wanti (vendedor / pagador del unlock).
+        txn = getattr(obj, 'wallet_transaction', None)
+        if txn is not None and getattr(txn, 'wallet', None) is not None:
+            return request.user.id == txn.wallet.user_id
+        return request.user.id == obj.seller_id
 
     def get_review_pending(self, obj):
         request = self.context.get('request')

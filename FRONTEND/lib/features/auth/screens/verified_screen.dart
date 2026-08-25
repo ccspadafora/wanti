@@ -46,7 +46,7 @@ class VerifiedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Ya podés publicar necesidades y explorar matches en Wanti.',
+                'Ya puedes publicar sueños y explorar matches en Wanti.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 15,

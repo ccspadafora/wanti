@@ -15,9 +15,19 @@ def get_inventory_item(item_id, seller=None) -> InventoryItem:
 
 
 def list_own_inventory(seller):
+    from django.db.models import Count, Q
+
+    from apps.common.constants import MatchStatus
+
     return (
         InventoryItem.objects.filter(seller=seller)
         .select_related('vehicle', 'property')
         .prefetch_related('images')
+        .annotate(
+            matches_count=Count(
+                'matches',
+                filter=~Q(matches__status=MatchStatus.DISCARDED),
+            )
+        )
         .order_by('-created_at')
     )

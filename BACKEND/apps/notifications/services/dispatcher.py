@@ -3,7 +3,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from apps.common.constants import NotificationChannel
-from apps.common.integrations.push.db_logger import send_push
+from apps.common.integrations.push.onesignal import send_push
 from apps.notifications.models import Notification
 
 

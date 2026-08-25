@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/wanti_colors.dart';
+import '../../core/utils/formatters.dart';
 
 class WantiButton extends StatelessWidget {
   const WantiButton({
@@ -75,6 +77,9 @@ class WantiField extends StatelessWidget {
     this.onChanged,
     this.validator,
     this.maxLines = 1,
+    this.inputFormatters,
+    this.readOnly = false,
+    this.onTap,
   });
 
   final String label;
@@ -87,6 +92,9 @@ class WantiField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final String? Function(String?)? validator;
   final int maxLines;
+  final List<TextInputFormatter>? inputFormatters;
+  final bool readOnly;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -111,11 +119,60 @@ class WantiField extends StatelessWidget {
           onChanged: onChanged,
           validator: validator,
           maxLines: obscure ? 1 : maxLines,
+          inputFormatters: inputFormatters,
+          readOnly: readOnly,
+          onTap: onTap,
           style: GoogleFonts.nunito(fontSize: 16, color: WantiColors.ink),
           decoration: InputDecoration(
             hintText: hint,
             suffixIcon: suffix,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class WantiDropdown<T> extends StatelessWidget {
+  const WantiDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.hint,
+  });
+
+  final String label;
+  final T? value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: GoogleFonts.nunito(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.24,
+            color: WantiColors.inkMuted,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<T>(
+          key: ValueKey(value),
+          initialValue: value,
+          hint: hint != null ? Text(hint!) : null,
+          items: items,
+          onChanged: onChanged,
+          isExpanded: true,
+          decoration: const InputDecoration(),
+          style: GoogleFonts.nunito(fontSize: 16, color: WantiColors.ink),
         ),
       ],
     );
@@ -247,6 +304,34 @@ class DotsProgress extends StatelessWidget {
           style: GoogleFonts.nunito(fontSize: 12, color: WantiColors.inkFaint),
         ),
       ],
+    );
+  }
+}
+
+/// Campo monetario COP: conserva foco, permite borrar y reformatea miles.
+class WantiCopField extends StatelessWidget {
+  const WantiCopField({
+    super.key,
+    required this.label,
+    required this.controller,
+    this.hint,
+    this.onChanged,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final String? hint;
+  final ValueChanged<String>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return WantiField(
+      label: label,
+      controller: controller,
+      hint: hint ?? r'Ej. $75.000.000',
+      keyboardType: TextInputType.number,
+      inputFormatters: [CopInputFormatter()],
+      onChanged: onChanged,
     );
   }
 }

@@ -8,6 +8,7 @@ from apps.contacts.models import ContactUnlock
 from apps.reviews.models import Review, ReviewTag
 from apps.reviews.selectors.reviews import (
     get_user_rating,
+    list_my_received_reviews,
     list_reviews_by_user,
     list_reviews_of_user,
 )
@@ -80,12 +81,12 @@ class MyReviewsListView(APIView):
 
     def get(self, request):
         review_type = request.query_params.get("type", "received")
-        if review_type == "given":
+        if review_type == 'given':
             qs = list_reviews_by_user(request.user)
-        elif review_type == "received":
-            qs = list_reviews_of_user(request.user)
+        elif review_type == 'received':
+            qs = list_my_received_reviews(request.user)
         else:
-            raise ValidationError("type debe ser given o received")
+            raise ValidationError('type debe ser given o received')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request, view=self)
         return paginator.get_paginated_response(ReviewSerializer(page, many=True).data)

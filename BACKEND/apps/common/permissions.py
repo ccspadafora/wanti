@@ -4,7 +4,7 @@ from apps.common.constants import UserRole
 
 
 class IsFullyVerified(BasePermission):
-    message = 'Debés verificar email y teléfono'
+    message = 'Debes verificar email y teléfono'
 
     def has_permission(self, request, view):
         user = request.user

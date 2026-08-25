@@ -9,7 +9,7 @@ from apps.users.selectors.users import get_user_by_email, get_user_by_id
 from apps.wallet.services.wallet import get_or_create_wallet
 
 
-PROFILE_WHITELIST = {'full_name', 'city', 'location', 'profile_photo_url'}
+PROFILE_WHITELIST = {'city', 'location'}
 PROFILE_FORBIDDEN = {
     'email',
     'phone',
@@ -18,11 +18,15 @@ PROFILE_FORBIDDEN = {
     'id_type',
     'id_number',
     'password',
+    'full_name',
+    'profile_photo_url',
 }
 
 
 @transaction.atomic
 def register_user(data: dict, ip_address=None) -> User:
+    from django.conf import settings
+
     email = (data.get('email') or '').strip().lower()
     if not email:
         raise ValidationError('El email es obligatorio')
@@ -44,13 +48,24 @@ def register_user(data: dict, ip_address=None) -> User:
     if data.get('location') is not None:
         user.location = data['location']
     user.set_password(data['password'])
+    if getattr(settings, 'AUTO_VERIFY_EMAIL', False):
+        user.email_verified_at = timezone.now()
     user.save()
 
     get_or_create_wallet(user)
 
-    from apps.authn.services.email_verification import send_verification_email
+    if not user.email_verified_at:
+        from apps.authn.services.email_verification import send_verification_email
 
-    send_verification_email(user)
+        send_verification_email(user)
+    else:
+        log_audit_event(
+            actor_user=user,
+            action='EMAIL_AUTO_VERIFIED',
+            entity='User',
+            entity_id=user.id,
+            metadata={'reason': 'AUTO_VERIFY_EMAIL'},
+        )
 
     log_audit_event(
         actor_user=None,
@@ -157,5 +172,60 @@ def activate_user_by_admin(target_user_id, actor_user: User) -> User:
         action='USER_REACTIVATED',
         entity='User',
         entity_id=target.id,
+    )
+    return target
+
+
+@transaction.atomic
+def admin_verify_user(
+    target_user_id,
+    actor_user: User,
+    *,
+    email: bool = False,
+    phone: bool = False,
+) -> User:
+    if actor_user.role not in (UserRole.ADMIN, UserRole.MODERATOR):
+        raise PermissionError()
+    if not email and not phone:
+        raise ValidationError('Indicá email y/o phone para verificar')
+    target = get_user_by_id(target_user_id)
+    fields = ['updated_at']
+    now = timezone.now()
+    if email:
+        target.email_verified_at = now
+        fields.append('email_verified_at')
+    if phone:
+        target.phone_verified_at = now
+        fields.append('phone_verified_at')
+    if target.status == UserStatus.PENDING and target.email_verified_at and target.phone_verified_at:
+        target.status = UserStatus.ACTIVE
+        fields.append('status')
+        get_or_create_wallet(target)
+    target.save(update_fields=fields)
+    log_audit_event(
+        actor_user=actor_user,
+        action='USER_VERIFICATION_OVERRIDE',
+        entity='User',
+        entity_id=target.id,
+        metadata={'email': email, 'phone': phone},
+    )
+    return target
+
+
+@transaction.atomic
+def admin_set_user_role(target_user_id, actor_user: User, role: str) -> User:
+    if actor_user.role != UserRole.ADMIN:
+        raise PermissionError('Solo administradores pueden cambiar roles')
+    if role not in {c[0] for c in UserRole.choices}:
+        raise ValidationError('Rol inválido')
+    target = get_user_by_id(target_user_id)
+    target.role = role
+    target.save(update_fields=['role', 'updated_at'])
+    log_audit_event(
+        actor_user=actor_user,
+        action='USER_ROLE_CHANGED',
+        entity='User',
+        entity_id=target.id,
+        metadata={'role': role},
     )
     return target

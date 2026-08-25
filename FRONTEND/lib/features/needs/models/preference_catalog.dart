@@ -34,25 +34,59 @@ class PreferenceCatalog {
   PreferenceCatalog._();
 
   static const vehicleCategories = [
-    ('MOTO', 'Moto'),
-    ('CAR', 'Automóvil / Camioneta'),
-    ('OTHER', 'Otros vehículos'),
+    ('CAR', 'Carros'),
+    ('SUV', 'Camionetas'),
+    ('MOTO', 'Motos'),
+    ('COLLECTION', 'Carros de colección'),
+    ('TRUCK', 'Camiones'),
+    ('NAUTICAL', 'Náutica'),
+    ('HEAVY_MACHINERY', 'Maquinaria pesada'),
   ];
 
-  static const paymentOptions = [
+  static String vehicleCategoryLabel(String code) {
+    for (final c in vehicleCategories) {
+      if (c.$1 == code) return c.$2;
+    }
+    return code;
+  }
+
+  static const _fourWheeler = {
+    'CAR',
+    'SUV',
+    'COLLECTION',
+    'TRUCK',
+    'OTHER',
+  };
+
+  /// Formas de pago para vehículos (sin crédito hipotecario).
+  static const vehiclePaymentOptions = [
     ('CASH', 'Efectivo'),
     ('TRANSFER', 'Transferencia'),
     ('CREDIT', 'Crédito'),
-    ('MORTGAGE', 'Crédito hipotecario'),
     ('TRADE_IN', 'Permuta'),
   ];
 
+  /// Formas de pago para inmuebles (sin transferencia típica de vehículos).
   static const propertyPaymentOptions = [
     ('CASH', 'Efectivo'),
     ('MORTGAGE', 'Crédito hipotecario'),
     ('CREDIT', 'Crédito'),
     ('TRADE_IN', 'Permuta'),
   ];
+
+  /// @Deprecated Use [vehiclePaymentOptions] o [paymentOptionsFor].
+  static const paymentOptions = vehiclePaymentOptions;
+
+  static List<(String, String)> paymentOptionsFor(String assetType) {
+    return assetType == 'PROPERTY' ? propertyPaymentOptions : vehiclePaymentOptions;
+  }
+
+  /// Quita tipos de pago que no aplican al asset actual.
+  static List<String> sanitizePaymentTypes(String assetType, List<String> types) {
+    final allowed = paymentOptionsFor(assetType).map((e) => e.$1).toSet();
+    final cleaned = types.where(allowed.contains).toList();
+    return cleaned.isEmpty ? ['CASH'] : cleaned;
+  }
 
   static const carBrands = [
     'Toyota',
@@ -142,35 +176,35 @@ class PreferenceCatalog {
       label: 'Carrocería',
       inputType: PreferenceInputType.dropdown,
       options: ['Hatchback', 'Sedán', 'Pick-up', 'SUV', 'Coupé', 'Van', 'Camioneta'],
-      categories: {'CAR', 'OTHER'},
+      categories: _fourWheeler,
     ),
     PreferenceFieldDef(
       key: 'traction',
       label: 'Tracción',
       inputType: PreferenceInputType.dropdown,
       options: ['4x4', '4x2', 'AWD'],
-      categories: {'CAR', 'OTHER'},
+      categories: _fourWheeler,
     ),
     PreferenceFieldDef(
       key: 'doors',
       label: 'Puertas',
       inputType: PreferenceInputType.dropdown,
       options: ['2', '3', '4', '5'],
-      categories: {'CAR', 'OTHER'},
+      categories: _fourWheeler,
     ),
     PreferenceFieldDef(
       key: 'transmission',
       label: 'Transmisión',
       inputType: PreferenceInputType.dropdown,
       options: ['Mecánica', 'Automática', 'Semi-automática'],
-      categories: {'CAR', 'OTHER'},
+      categories: _fourWheeler,
     ),
     PreferenceFieldDef(
       key: 'steering',
       label: 'Dirección',
       inputType: PreferenceInputType.dropdown,
       options: ['Hidráulica', 'Mecánica', 'Eléctrica'],
-      categories: {'CAR', 'OTHER'},
+      categories: _fourWheeler,
     ),
     PreferenceFieldDef(
       key: 'plate_last_digit',

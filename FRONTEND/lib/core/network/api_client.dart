@@ -11,6 +11,8 @@ typedef TokenRefresher = Future<bool> Function();
 class ApiClient {
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
 
+  static const _timeout = Duration(seconds: 15);
+
   final http.Client _client;
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
@@ -52,17 +54,19 @@ class ApiClient {
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
     bool auth = true,
   }) {
-    return _request('POST', path, body: body, auth: auth);
+    return _request('POST', path, body: body, headers: headers, auth: auth);
   }
 
   Future<Map<String, dynamic>> patch(
     String path, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
     bool auth = true,
   }) {
-    return _request('PATCH', path, body: body, auth: auth);
+    return _request('PATCH', path, body: body, headers: headers, auth: auth);
   }
 
   Future<Map<String, dynamic>> delete(String path, {bool auth = true}) {
@@ -74,37 +78,43 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     Map<String, String>? query,
+    Map<String, String>? headers,
     bool auth = true,
     bool retried = false,
   }) async {
     final uri = Uri.parse('${ApiConfig.apiV1}$path').replace(queryParameters: query);
-    final headers = <String, String>{
+    final reqHeaders = <String, String>{
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      ...?headers,
     };
     if (auth && _access != null) {
-      headers['Authorization'] = 'Bearer $_access';
+      reqHeaders['Authorization'] = 'Bearer $_access';
     }
 
     late http.Response response;
     try {
       switch (method) {
         case 'GET':
-          response = await _client.get(uri, headers: headers);
+          response = await _client.get(uri, headers: reqHeaders).timeout(_timeout);
         case 'POST':
-          response = await _client.post(
-            uri,
-            headers: headers,
-            body: body == null ? null : jsonEncode(body),
-          );
+          response = await _client
+              .post(
+                uri,
+                headers: reqHeaders,
+                body: body == null ? null : jsonEncode(body),
+              )
+              .timeout(_timeout);
         case 'PATCH':
-          response = await _client.patch(
-            uri,
-            headers: headers,
-            body: body == null ? null : jsonEncode(body),
-          );
+          response = await _client
+              .patch(
+                uri,
+                headers: reqHeaders,
+                body: body == null ? null : jsonEncode(body),
+              )
+              .timeout(_timeout);
         case 'DELETE':
-          response = await _client.delete(uri, headers: headers);
+          response = await _client.delete(uri, headers: reqHeaders).timeout(_timeout);
         default:
           throw ApiException(message: 'Método no soportado: $method');
       }
@@ -112,7 +122,7 @@ class ApiClient {
       if (e is ApiException) rethrow;
       throw ApiException(
         message: 'No se pudo conectar con el servidor (${ApiConfig.baseUrl}). '
-            'Verificá que el backend esté corriendo.',
+            'Verifica tu conexión a internet.',
       );
     }
 
@@ -124,6 +134,7 @@ class ApiClient {
           path,
           body: body,
           query: query,
+          headers: headers,
           auth: auth,
           retried: true,
         );

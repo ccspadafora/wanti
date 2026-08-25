@@ -1,26 +1,44 @@
 from django.urls import path
 
 from apps.admin_panel.views import (
+    AdminAuditLogListView,
+    AdminContactUnlockListView,
     AdminDisputeApproveView,
     AdminDisputeListView,
     AdminDisputeRejectView,
     AdminInteractionsReportView,
+    AdminInventoryDeactivateView,
+    AdminInventoryDetailView,
+    AdminInventoryFlagView,
     AdminInventoryListView,
+    AdminInventoryReactivateView,
+    AdminMatchListView,
     AdminMatchingReportView,
     AdminMetricsView,
+    AdminNeedDetailView,
     AdminNeedFlagView,
     AdminNeedListView,
     AdminNeedUnpublishView,
+    AdminNotificationListView,
+    AdminPackageDetailView,
+    AdminPackageListCreateView,
     AdminReviewDisputeListView,
     AdminReviewDisputeResolveView,
+    AdminReviewTagDetailView,
+    AdminReviewTagListView,
     AdminSettingsListView,
     AdminSettingsUpdateView,
+    AdminTopupCompleteView,
+    AdminTopupFailView,
     AdminTopupListView,
     AdminUserActivateView,
     AdminUserDetailView,
     AdminUserListView,
+    AdminUserSetRoleView,
     AdminUserSuspendView,
+    AdminUserVerifyView,
     AdminWalletAdjustView,
+    AdminWalletTransactionsView,
 )
 
 urlpatterns = [
@@ -33,7 +51,10 @@ urlpatterns = [
         AdminUserActivateView.as_view(),
         name='admin-user-activate',
     ),
+    path('users/<uuid:id>/verify/', AdminUserVerifyView.as_view(), name='admin-user-verify'),
+    path('users/<uuid:id>/set-role/', AdminUserSetRoleView.as_view(), name='admin-user-set-role'),
     path('needs/', AdminNeedListView.as_view(), name='admin-needs'),
+    path('needs/<uuid:id>/', AdminNeedDetailView.as_view(), name='admin-need-detail'),
     path('needs/<uuid:id>/flag/', AdminNeedFlagView.as_view(), name='admin-need-flag'),
     path(
         'needs/<uuid:id>/unpublish/',
@@ -41,6 +62,26 @@ urlpatterns = [
         name='admin-need-unpublish',
     ),
     path('inventory/', AdminInventoryListView.as_view(), name='admin-inventory'),
+    path(
+        'inventory/<uuid:id>/',
+        AdminInventoryDetailView.as_view(),
+        name='admin-inventory-detail',
+    ),
+    path(
+        'inventory/<uuid:id>/flag/',
+        AdminInventoryFlagView.as_view(),
+        name='admin-inventory-flag',
+    ),
+    path(
+        'inventory/<uuid:id>/deactivate/',
+        AdminInventoryDeactivateView.as_view(),
+        name='admin-inventory-deactivate',
+    ),
+    path(
+        'inventory/<uuid:id>/reactivate/',
+        AdminInventoryReactivateView.as_view(),
+        name='admin-inventory-reactivate',
+    ),
     path('disputes/', AdminDisputeListView.as_view(), name='admin-disputes'),
     path(
         'disputes/<uuid:id>/approve/',
@@ -53,10 +94,27 @@ urlpatterns = [
         name='admin-dispute-reject',
     ),
     path('topups/', AdminTopupListView.as_view(), name='admin-topups'),
+    path('topups/<uuid:id>/fail/', AdminTopupFailView.as_view(), name='admin-topup-fail'),
+    path(
+        'topups/<uuid:id>/complete/',
+        AdminTopupCompleteView.as_view(),
+        name='admin-topup-complete',
+    ),
+    path('packages/', AdminPackageListCreateView.as_view(), name='admin-packages'),
+    path(
+        'packages/<uuid:id>/',
+        AdminPackageDetailView.as_view(),
+        name='admin-package-detail',
+    ),
     path(
         'wallets/<uuid:user_id>/adjust/',
         AdminWalletAdjustView.as_view(),
         name='admin-wallet-adjust',
+    ),
+    path(
+        'wallets/<uuid:user_id>/transactions/',
+        AdminWalletTransactionsView.as_view(),
+        name='admin-wallet-transactions',
     ),
     path(
         'review-disputes/',
@@ -67,6 +125,12 @@ urlpatterns = [
         'review-disputes/<uuid:id>/resolve/',
         AdminReviewDisputeResolveView.as_view(),
         name='admin-review-dispute-resolve',
+    ),
+    path('review-tags/', AdminReviewTagListView.as_view(), name='admin-review-tags'),
+    path(
+        'review-tags/<uuid:id>/',
+        AdminReviewTagDetailView.as_view(),
+        name='admin-review-tag-detail',
     ),
     path(
         'reports/interactions/',
@@ -83,5 +147,17 @@ urlpatterns = [
         'settings/<str:key>/',
         AdminSettingsUpdateView.as_view(),
         name='admin-settings-update',
+    ),
+    path('audit-logs/', AdminAuditLogListView.as_view(), name='admin-audit-logs'),
+    path(
+        'notifications/',
+        AdminNotificationListView.as_view(),
+        name='admin-notifications',
+    ),
+    path('matches/', AdminMatchListView.as_view(), name='admin-matches'),
+    path(
+        'contact-unlocks/',
+        AdminContactUnlockListView.as_view(),
+        name='admin-contact-unlocks',
     ),
 ]

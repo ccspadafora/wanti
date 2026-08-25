@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/wanti_colors.dart';
+import '../../../core/utils/colombia_cities.dart';
+import '../../../core/utils/password_rules.dart';
 import '../../../shared/widgets/wanti_logo.dart';
 import '../../../shared/widgets/wanti_widgets.dart';
 import '../state/auth_controller.dart';
@@ -21,11 +23,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _idNumber = TextEditingController();
   final _fullName = TextEditingController();
   final _email = TextEditingController();
-  final _city = TextEditingController();
   final _phone = TextEditingController(text: '+57 ');
   final _password = TextEditingController();
+  final _passwordConfirm = TextEditingController();
   String _idType = 'CC';
+  String? _city;
   bool _obscure = true;
+  bool _obscureConfirm = true;
   bool _loading = false;
 
   @override
@@ -33,14 +37,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _idNumber.dispose();
     _fullName.dispose();
     _email.dispose();
-    _city.dispose();
     _phone.dispose();
     _password.dispose();
+    _passwordConfirm.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_city == null || _city!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selecciona una ciudad')),
+      );
+      return;
+    }
     setState(() => _loading = true);
     try {
       await context.read<AuthController>().register(
@@ -50,13 +60,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
             idType: _idType,
             idNumber: _idNumber.text.trim(),
             phone: _phone.text.trim(),
-            city: _city.text.trim(),
+            city: _city!,
           );
       if (!mounted) return;
-      context.go('/verify-email');
+      final auth = context.read<AuthController>();
+      if (auth.needsEmailVerification) {
+        context.go('/verify-email');
+      } else if (auth.needsPhoneVerification) {
+        context.go('/verify-phone');
+      } else {
+        context.go('/home');
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.displayMessage),
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -71,23 +93,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const WantiLogo(
-                    variant: WantiLogoVariant.wordmark,
-                    height: 48,
-                    surface: true,
-                    surfaceRadius: 16,
-                    surfacePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const Center(
+                    child: WantiLogo(
+                      variant: WantiLogoVariant.wordmark,
+                      height: 44,
+                      alignment: Alignment.center,
+                      surface: true,
+                      surfaceRadius: 16,
+                      surfacePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   Text(
                     'El marketplace al revés',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -176,12 +202,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         },
                       ),
                       const SizedBox(height: 16),
-                      WantiField(
+                      WantiDropdown<String>(
                         label: 'Ciudad',
-                        controller: _city,
-                        hint: 'Bogotá',
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Obligatorio' : null,
+                        value: _city,
+                        hint: 'Selecciona',
+                        items: ColombiaCities.all
+                            .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (v) => setState(() => _city = v),
                       ),
                       const SizedBox(height: 16),
                       WantiField(
@@ -197,16 +225,74 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         label: 'Contraseña',
                         controller: _password,
                         obscure: _obscure,
-                        validator: (v) {
-                          if (v == null || v.length < 8) return 'Mínimo 8 caracteres';
-                          return null;
-                        },
+                        validator: (v) => PasswordRules.validate(
+                          v,
+                          email: _email.text,
+                          fullName: _fullName.text,
+                        ),
                         suffix: IconButton(
                           onPressed: () => setState(() => _obscure = !_obscure),
                           icon: Icon(
                             _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                             color: WantiColors.inkFaint,
                           ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      WantiField(
+                        label: 'Confirmar contraseña',
+                        controller: _passwordConfirm,
+                        obscure: _obscureConfirm,
+                        validator: (v) {
+                          if (v == null || v.isEmpty) return 'Obligatorio';
+                          if (v != _password.text) return 'Las contraseñas no coinciden';
+                          return null;
+                        },
+                        suffix: IconButton(
+                          onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                          icon: Icon(
+                            _obscureConfirm
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined,
+                            color: WantiColors.inkFaint,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: WantiColors.surfaceSoft,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: WantiColors.borderLight),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'La contraseña debe cumplir:',
+                              style: GoogleFonts.nunito(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: WantiColors.inkMuted,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ...PasswordRules.requirements.map(
+                              (r) => Padding(
+                                padding: const EdgeInsets.only(bottom: 2),
+                                child: Text(
+                                  '• $r',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12,
+                                    color: WantiColors.inkFaint,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -218,7 +304,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          'Podés publicar y vender desde el mismo perfil',
+                          'Puedes publicar y vender desde el mismo perfil',
                           textAlign: TextAlign.center,
                           style: GoogleFonts.nunito(
                             fontSize: 13,
@@ -237,7 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       Center(
                         child: TextButton(
                           onPressed: () => context.go('/login'),
-                          child: const Text('¿Ya tenés cuenta? Inicia sesión'),
+                          child: const Text('¿Ya tienes cuenta? Inicia sesión'),
                         ),
                       ),
                     ],

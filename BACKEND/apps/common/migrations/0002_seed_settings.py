@@ -13,7 +13,7 @@ SETTINGS = [
     ('DISPUTE_APPEAL_DAYS', '7', 'INT', 'Días para apelar una disputa resuelta'),
     ('OTP_TTL_SECONDS', '300', 'INT', 'Vigencia del OTP (5 min)'),
     ('OTP_MAX_ATTEMPTS', '5', 'INT', 'Máximo de intentos de OTP antes de invalidar'),
-    ('REVIEW_REWARD_THRESHOLD', '5', 'INT', 'Cantidad de reseñas para recompensa en Wantis'),
+    ('REVIEW_REWARD_THRESHOLD', '5', 'INT', 'Cantidad de reseñas para recompensa en Wanti'),
 ]
 
 

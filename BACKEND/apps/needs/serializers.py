@@ -73,8 +73,17 @@ class NeedCreateSerializer(serializers.Serializer):
         allow_empty=False,
     )
     trade_in_description = serializers.CharField(required=False, allow_blank=True, default='')
+    trade_in_inventory_id = serializers.UUIDField(required=False, allow_null=True)
     city = serializers.CharField(max_length=100)
-    location = LatLngField()
+    department = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    geo_city_id = serializers.UUIDField(required=False, allow_null=True)
+    willing_to_travel = serializers.BooleanField(required=False, default=False)
+    travel_city_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        required=False,
+        default=list,
+    )
+    location = LatLngField(required=False)
     detail = serializers.DictField(required=False, default=dict)
     criteria = NeedCriterionInputSerializer(many=True, required=False, default=list)
     images = NeedImageInputSerializer(many=True, required=False, default=list)
@@ -83,11 +92,35 @@ class NeedCreateSerializer(serializers.Serializer):
         payment_types = attrs.get('payment_types') or []
         payment_type = attrs.get('payment_type')
         if not payment_types and not payment_type:
-            raise serializers.ValidationError({'payment_type': 'Indicá al menos un tipo de pago'})
+            raise serializers.ValidationError({'payment_type': 'Indica al menos un tipo de pago'})
         if not payment_types:
             attrs['payment_types'] = [payment_type]
         if not payment_type:
             attrs['payment_type'] = attrs['payment_types'][0]
+
+        asset_type = attrs.get('asset_type')
+        allowed = {
+            AssetType.VEHICLE: {'CASH', 'TRANSFER', 'CREDIT', 'TRADE_IN'},
+            AssetType.PROPERTY: {'CASH', 'MORTGAGE', 'CREDIT', 'TRADE_IN'},
+        }.get(asset_type, set())
+        if allowed:
+            invalid = [p for p in attrs['payment_types'] if p not in allowed]
+            if invalid:
+                raise serializers.ValidationError(
+                    {
+                        'payment_types': (
+                            f'Tipo(s) de pago no válidos para {asset_type}: {", ".join(invalid)}'
+                        )
+                    }
+                )
+        if 'TRADE_IN' in attrs.get('payment_types', []) and not attrs.get('trade_in_inventory_id'):
+            raise serializers.ValidationError(
+                {
+                    'trade_in_inventory_id': (
+                        'Selecciona o crea un inventario para ofrecer en permuta'
+                    )
+                }
+            )
         return attrs
 
     def to_service_data(self):
@@ -100,8 +133,13 @@ class NeedCreateSerializer(serializers.Serializer):
             'payment_types': self.validated_data.get('payment_types')
             or [self.validated_data['payment_type']],
             'trade_in_description': self.validated_data.get('trade_in_description', ''),
+            'trade_in_inventory_id': self.validated_data.get('trade_in_inventory_id'),
             'city': self.validated_data['city'],
-            'location': self.validated_data['location'],
+            'department': self.validated_data.get('department', ''),
+            'geo_city_id': self.validated_data.get('geo_city_id'),
+            'willing_to_travel': self.validated_data.get('willing_to_travel', False),
+            'travel_city_ids': self.validated_data.get('travel_city_ids') or [],
+            'location': self.validated_data.get('location'),
             'detail': self.validated_data.get('detail') or {},
             'criteria': self.validated_data.get('criteria') or [],
             'images': self.validated_data.get('images') or [],
@@ -138,6 +176,8 @@ class NeedSerializer(serializers.ModelSerializer):
     property = PropertyNeedSerializer(read_only=True)
     buyer = PublicBuyerSerializer(read_only=True)
     detail = serializers.SerializerMethodField()
+    travel_cities = serializers.SerializerMethodField()
+    trade_in_item = serializers.SerializerMethodField()
 
     class Meta:
         model = Need
@@ -148,7 +188,14 @@ class NeedSerializer(serializers.ModelSerializer):
             'description',
             'budget_max_cop',
             'payment_type',
+            'payment_types',
+            'trade_in_description',
+            'trade_in_item',
             'city',
+            'department',
+            'geo_city',
+            'willing_to_travel',
+            'travel_cities',
             'location',
             'status',
             'expires_at',
@@ -166,6 +213,29 @@ class NeedSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields
 
+    def get_travel_cities(self, obj):
+        return [
+            {
+                'id': str(c.id),
+                'name': c.name,
+                'department': c.department.name,
+            }
+            for c in obj.travel_cities.select_related('department').all()
+        ]
+
+    def get_trade_in_item(self, obj):
+        item = obj.trade_in_item
+        if item is None:
+            return None
+        return {
+            'id': str(item.id),
+            'title': item.title,
+            'asset_type': item.asset_type,
+            'price_cop': str(item.price_cop),
+            'city': item.city,
+            'status': item.status,
+        }
+
     def get_detail(self, obj):
         if obj.asset_type == AssetType.VEHICLE and hasattr(obj, 'vehicle'):
             return VehicleNeedSerializer(obj.vehicle).data
@@ -179,6 +249,9 @@ class NeedListSerializer(serializers.ModelSerializer):
     buyer = PublicBuyerSerializer(read_only=True)
     can_renew = serializers.SerializerMethodField()
     days_remaining = serializers.SerializerMethodField()
+    thumbnail_url = serializers.SerializerMethodField()
+    detail = serializers.SerializerMethodField()
+    description = serializers.CharField(read_only=True)
 
     class Meta:
         model = Need
@@ -186,9 +259,11 @@ class NeedListSerializer(serializers.ModelSerializer):
             'id',
             'asset_type',
             'title',
+            'description',
             'budget_max_cop',
             'payment_type',
             'city',
+            'department',
             'location',
             'status',
             'matches_count',
@@ -198,6 +273,8 @@ class NeedListSerializer(serializers.ModelSerializer):
             'can_renew',
             'created_at',
             'buyer',
+            'thumbnail_url',
+            'detail',
         )
         read_only_fields = fields
 
@@ -217,6 +294,18 @@ class NeedListSerializer(serializers.ModelSerializer):
 
         days_left = (obj.expires_at - timezone.now()).total_seconds() / 86400
         return 0 <= days_left <= 5
+
+    def get_thumbnail_url(self, obj):
+        from apps.needs.services.thumbnails import thumbnail_url_for_need
+
+        return thumbnail_url_for_need(obj)
+
+    def get_detail(self, obj):
+        if obj.asset_type == AssetType.VEHICLE and hasattr(obj, 'vehicle'):
+            return VehicleNeedSerializer(obj.vehicle).data
+        if obj.asset_type == AssetType.PROPERTY and hasattr(obj, 'property'):
+            return PropertyNeedSerializer(obj.property).data
+        return None
 
 
 class NeedStatusSerializer(serializers.ModelSerializer):

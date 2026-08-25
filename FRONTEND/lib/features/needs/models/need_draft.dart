@@ -1,4 +1,5 @@
 import 'preference_catalog.dart';
+import '../../catalog/models/vehicle_catalog_models.dart';
 
 class NeedDraft {
   String assetType = 'VEHICLE';
@@ -7,23 +8,57 @@ class NeedDraft {
   String brand = '';
   String model = '';
   String line = '';
+  int? year;
+  String catalogVersionId = '';
   String propertyTitle = '';
   double budgetMaxCop = 0;
   List<String> paymentTypes = ['CASH'];
   String tradeInDescription = '';
+  String? tradeInInventoryId;
+  String? tradeInInventoryTitle;
   String city = '';
+  String department = '';
+  String geoCityId = '';
+  double? latitude;
+  double? longitude;
+  bool willingToTravel = false;
+  final List<({String id, String name, String department})> travelCities = [];
   String description = '';
   bool legalAccepted = false;
+  CatalogVersionSpecs? versionSpecs;
 
   final Map<String, CriterionValue> criteria = {};
 
   bool get isVehicle => assetType == 'VEHICLE';
   bool get acceptsTradeIn => paymentTypes.contains('TRADE_IN');
 
+  void applyVersionSpecs(CatalogVersionSpecs specs) {
+    versionSpecs = specs;
+    for (final entry in specs.defaults.entries) {
+      final value = entry.value;
+      if (value == null) continue;
+      if (criteria.containsKey(entry.key)) {
+        setCriterionValue(entry.key, value);
+      }
+    }
+  }
+
+  List<String> optionsForCriterion(String key, List<String> fallback) {
+    final specs = versionSpecs;
+    if (specs == null) return fallback;
+    return specs.optionsFor(key, fallback);
+  }
+
+  bool isCriterionLocked(String key) => versionSpecs?.isLocked(key) == true;
+
   String get title {
     if (isVehicle) {
-      final parts = [brand, model, line].where((e) => e.trim().isNotEmpty);
-      return parts.join(' ').trim();
+      return vehicleListingTitle(
+        brand: brand,
+        model: model,
+        version: line,
+        year: year,
+      );
     }
     if (propertyTitle.trim().isNotEmpty) return propertyTitle.trim();
     final type = PreferenceCatalog.propertyTypeLabel(propertyType);
@@ -83,12 +118,21 @@ class NeedDraft {
     required double latitude,
     required double longitude,
   }) {
+    final lat = this.latitude ?? latitude;
+    final lng = this.longitude ?? longitude;
     final detail = <String, dynamic>{};
     if (isVehicle) {
       detail['vehicle_category'] = vehicleCategory;
       detail['brand'] = brand.trim();
       detail['model'] = model.trim();
       detail['line'] = line.trim();
+      if (catalogVersionId.isNotEmpty) {
+        detail['catalog_version_id'] = catalogVersionId;
+      }
+      if (year != null) {
+        detail['year_min'] = year;
+        detail['year_max'] = year;
+      }
     } else {
       detail['property_type'] = propertyType;
     }
@@ -113,15 +157,21 @@ class NeedDraft {
     return {
       'asset_type': assetType,
       'title': title.isEmpty
-          ? (isVehicle ? 'Necesidad de vehículo' : 'Necesidad de inmueble')
+          ? (isVehicle ? 'Sueño de vehículo' : 'Sueño de inmueble')
           : title,
       'description': description,
       'budget_max_cop': budgetMaxCop.toStringAsFixed(2),
       'payment_type': paymentTypes.isNotEmpty ? paymentTypes.first : 'CASH',
       'payment_types': paymentTypes,
       'trade_in_description': acceptsTradeIn ? tradeInDescription.trim() : '',
+      if (acceptsTradeIn && tradeInInventoryId != null)
+        'trade_in_inventory_id': tradeInInventoryId,
       'city': city,
-      'location': {'latitude': latitude, 'longitude': longitude},
+      'department': department,
+      if (geoCityId.isNotEmpty) 'geo_city_id': geoCityId,
+      'willing_to_travel': willingToTravel,
+      'travel_city_ids': willingToTravel ? travelCities.map((e) => e.id).toList() : [],
+      'location': {'latitude': lat, 'longitude': lng},
       'detail': detail,
       'criteria': criteria.entries
           .where((e) => e.value.value != null)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/state/app_mode_controller.dart';
 import '../../../core/theme/wanti_colors.dart';
@@ -83,9 +84,18 @@ class ProfileScreen extends StatelessWidget {
                       Text(user?.email ?? '', style: GoogleFonts.nunito(color: WantiColors.inkMuted)),
                       Text(user?.phone ?? '', style: GoogleFonts.nunito(color: WantiColors.inkMuted)),
                       Text(
-                        '${user?.city ?? ''} · ${mode.isSeller ? 'Vendedor' : 'Comprador'}',
+                        '${user?.city ?? ''} · ${mode.isSeller ? 'Vender' : 'Comprar'}',
                         style: GoogleFonts.nunito(color: WantiColors.inkFaint, fontSize: 13),
                       ),
+                      if (user?.ratingAverage != null)
+                        Text(
+                          '★ ${user!.ratingAverage!.toStringAsFixed(1)}',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w700,
+                            color: WantiColors.warning,
+                            fontSize: 13,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -93,29 +103,38 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          if (mode.isSeller)
+            _ProfileLink(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'Mi Wallet',
+              subtitle: 'Saldo y recargas para comprar matches',
+              onTap: () => context.push('/wallet'),
+            ),
           _ProfileLink(
-            icon: Icons.edit_outlined,
-            title: 'Editar datos',
-            subtitle: 'Nombre, ciudad y foto',
+            icon: Icons.star_outline_rounded,
+            title: 'Mis reseñas',
+            subtitle: 'Recibidas y enviadas',
+            onTap: () => context.push('/profile/reviews'),
+          ),
+          _ProfileLink(
+            icon: Icons.location_city_outlined,
+            title: 'Editar ciudad',
+            subtitle: (user?.city != null && user!.city!.isNotEmpty)
+                ? user.city!
+                : 'Selecciona tu ciudad',
             onTap: () => context.push('/profile/edit'),
-          ),
-          _ProfileLink(
-            icon: Icons.email_outlined,
-            title: 'Cambiar email',
-            subtitle: user?.email ?? '',
-            onTap: () => context.push('/profile/change-email'),
-          ),
-          _ProfileLink(
-            icon: Icons.phone_outlined,
-            title: 'Cambiar teléfono',
-            subtitle: user?.phone ?? '',
-            onTap: () => context.push('/profile/change-phone'),
           ),
           _ProfileLink(
             icon: Icons.lock_outline_rounded,
             title: 'Cambiar contraseña',
-            subtitle: 'Actualizá tu acceso',
+            subtitle: 'Actualiza tu acceso',
             onTap: () => context.push('/profile/change-password'),
+          ),
+          _ProfileLink(
+            icon: Icons.support_agent_outlined,
+            title: 'Solicitar cambio de datos',
+            subtitle: 'Correo, teléfono o nombre · equipo 1T',
+            onTap: () => _contactSupport(context, user?.email),
           ),
           const SizedBox(height: 12),
           TextButton(
@@ -130,6 +149,25 @@ class ProfileScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+Future<void> _contactSupport(BuildContext context, String? userEmail) async {
+  final body = Uri.encodeComponent(
+    'Hola equipo 1T,\n\n'
+    'Necesito actualizar datos de mi cuenta Wanti'
+    '${userEmail != null && userEmail.isNotEmpty ? ' ($userEmail)' : ''}.\n\n'
+    'Dato a cambiar:\n'
+    'Valor actual:\n'
+    'Valor nuevo:\n',
+  );
+  final uri = Uri.parse('mailto:soporte@wanti.co?subject=Solicitud%20cambio%20de%20datos%20Wanti&body=$body');
+  final launched = await launchUrl(uri);
+  if (!context.mounted) return;
+  if (!launched) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Escribe a soporte@wanti.co para solicitar el cambio')),
     );
   }
 }

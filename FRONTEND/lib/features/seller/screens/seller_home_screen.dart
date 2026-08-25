@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/state/app_mode_controller.dart';
 import '../../../core/theme/wanti_colors.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/match_cards.dart';
@@ -13,6 +14,7 @@ import '../../inventory/data/inventory_repository.dart';
 import '../../leads/data/leads_repository.dart';
 import '../../matches/data/matches_repository.dart';
 import '../../matches/models/match_model.dart';
+import '../seller_match_actions.dart';
 
 class SellerHomeScreen extends StatefulWidget {
   const SellerHomeScreen({super.key});
@@ -28,6 +30,9 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   int _inventoryCount = 0;
   int _leadsCount = 0;
   final _search = TextEditingController();
+  String? _unlockingId;
+  int? _catalogEpoch;
+  String _scoreFilter = 'ALL';
 
   @override
   void initState() {
@@ -72,10 +77,17 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   }
 
   List<MatchModel> get _filtered {
+    var list = _alerts;
+    if (_scoreFilter == 'HIGH') {
+      list = list.where((m) => m.score >= 85).toList();
+    } else if (_scoreFilter == 'LOW') {
+      list = list.where((m) => m.score < 85).toList();
+    }
     final q = _search.text.trim().toLowerCase();
-    if (q.isEmpty) return _alerts;
-    return _alerts.where((m) {
-      final hay = '${m.needTitle} ${m.itemTitle} ${m.buyer?.fullName}'.toLowerCase();
+    if (q.isEmpty) return list;
+    return list.where((m) {
+      final hay =
+          '${m.needTitle} ${m.itemTitle} ${m.buyer?.fullName} ${m.needCity}'.toLowerCase();
       return hay.contains(q);
     }).toList();
   }
@@ -83,6 +95,13 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user;
+    final epoch = context.watch<AppModeController>().catalogEpoch;
+    if (_catalogEpoch != null && _catalogEpoch != epoch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
+    _catalogEpoch = epoch;
     final filtered = _filtered;
 
     return RefreshIndicator(
@@ -96,7 +115,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
               children: [
                 HomeAppHeader(
                   greeting: 'Hola, ${user?.firstName ?? ''} 👋',
-                  subtitle: 'Modo vendedor',
+                  subtitle: 'Modo vender',
                 ),
                 Container(
                   width: double.infinity,
@@ -109,7 +128,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                         controller: _search,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          hintText: 'Buscar necesidades de compradores...',
+                          hintText: 'Buscar comprador, sueño o ítem…',
                           prefixIcon: const Icon(Icons.search, color: WantiColors.inkFaint),
                           filled: true,
                           fillColor: WantiColors.canvas,
@@ -119,10 +138,32 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Explora lo que los compradores están buscando',
-                        style: GoogleFonts.nunito(fontSize: 12, color: WantiColors.inkMuted),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: WantiColors.canvas.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            _HomeSeg(
+                              label: 'Todos',
+                              selected: _scoreFilter == 'ALL',
+                              onTap: () => setState(() => _scoreFilter = 'ALL'),
+                            ),
+                            _HomeSeg(
+                              label: '≥ 85%',
+                              selected: _scoreFilter == 'HIGH',
+                              onTap: () => setState(() => _scoreFilter = 'HIGH'),
+                            ),
+                            _HomeSeg(
+                              label: '< 85%',
+                              selected: _scoreFilter == 'LOW',
+                              onTap: () => setState(() => _scoreFilter = 'LOW'),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -152,10 +193,14 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: _StatCard(
-                      label: 'Leads',
-                      value: '$_leadsCount',
-                      color: WantiColors.warning,
+                    child: InkWell(
+                      onTap: () => context.push('/leads'),
+                      borderRadius: BorderRadius.circular(14),
+                      child: _StatCard(
+                        label: 'Contactos',
+                        value: '$_leadsCount',
+                        color: WantiColors.warning,
+                      ),
                     ),
                   ),
                 ],
@@ -164,28 +209,117 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
           ),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Últimas alertas de match',
-                      style: GoogleFonts.nunito(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: WantiColors.ink,
-                      ),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              child: Material(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  onTap: () => context.push('/needs/browse'),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: WantiColors.borderLight),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: WantiColors.surfaceTeal,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.travel_explore_rounded,
+                            color: WantiColors.tealDark,
+                            size: 26,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Explorar sueños',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: WantiColors.ink,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Busca necesidades activas por marca, modelo y más — sin depender de tu inventario.',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 12,
+                                  color: WantiColors.inkMuted,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right, color: WantiColors.inkFaint),
+                      ],
                     ),
                   ),
-                  TextButton(
-                    onPressed: () => context.push('/leads'),
-                    child: Text(
-                      'Mis leads →',
-                      style: GoogleFonts.nunito(
-                        fontWeight: FontWeight.w700,
-                        color: WantiColors.teal,
-                      ),
+                ),
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Últimas alertas de match',
+                    style: GoogleFonts.nunito(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: WantiColors.ink,
                     ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 0,
+                    children: [
+                      TextButton(
+                        onPressed: () => context.push('/contacts/purchasers'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Contactos desbloqueados',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w700,
+                            color: WantiColors.navy,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => context.push('/leads'),
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                        child: Text(
+                          'Mis contactos →',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w700,
+                            color: WantiColors.teal,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -210,7 +344,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Todavía no hay alertas. Publicá inventario para recibir matches.',
+                  'Todavía no hay alertas. Publica inventario para recibir matches.',
                   style: GoogleFonts.nunito(color: WantiColors.inkMuted),
                 ),
               ),
@@ -222,7 +356,21 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
                   final match = filtered[index];
                   return Padding(
                     padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                    child: SellerMatchCard(match: match),
+                    child: SellerMatchCard(
+                      match: match,
+                      unlocking: _unlockingId == match.id,
+                      onUnlock: () async {
+                        setState(() => _unlockingId = match.id);
+                        await unlockSellerMatch(
+                          context,
+                          match,
+                          onDone: _load,
+                        );
+                        if (mounted) setState(() => _unlockingId = null);
+                      },
+                      onOpenLead: () => openSellerLeadFromMatch(context, match),
+                      onDiscard: () => _discard(match),
+                    ),
                   );
                 },
                 childCount: filtered.take(5).length,
@@ -241,6 +389,69 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _discard(MatchModel match) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('¿Descartar alerta?', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text(
+          'Esta coincidencia dejará de aparecer en tus alertas.',
+          style: GoogleFonts.nunito(),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Descartar')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await context.read<MatchesRepository>().discard(match.id);
+      _load();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+}
+
+class _HomeSeg extends StatelessWidget {
+  const _HomeSeg({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: selected ? WantiColors.navy : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: GoogleFonts.nunito(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: selected ? Colors.white : WantiColors.inkMuted,
+            ),
+          ),
+        ),
       ),
     );
   }

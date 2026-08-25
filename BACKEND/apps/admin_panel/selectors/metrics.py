@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db.models import Avg, Count, Sum
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 
 from apps.common.constants import (
@@ -17,11 +18,32 @@ from apps.common.services.settings_service import get_setting
 from apps.contacts.models import ContactUnlock
 from apps.disputes.models import Dispute
 from apps.inventory.models import InventoryItem
+from apps.leads.models import Lead
 from apps.matching.models import Match
 from apps.needs.models import Need
 from apps.reviews.models import Review, ReviewDispute
 from apps.users.models import User
 from apps.wallet.models import TopupOrder, Wallet
+
+
+def _daily_counts(qs, field='created_at', days=7):
+    now = timezone.now()
+    start = (now - timedelta(days=days - 1)).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    rows = (
+        qs.filter(**{f'{field}__gte': start})
+        .annotate(day=TruncDate(field))
+        .values('day')
+        .annotate(count=Count('id'))
+        .order_by('day')
+    )
+    by_day = {r['day'].isoformat(): r['count'] for r in rows if r['day']}
+    out = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).date().isoformat()
+        out.append({'date': d, 'count': by_day.get(d, 0)})
+    return out
 
 
 def get_dashboard_metrics() -> dict:
@@ -37,6 +59,7 @@ def get_dashboard_metrics() -> dict:
 
     needs_total = Need.objects.count()
     needs_active = Need.objects.filter(status=NeedStatus.ACTIVE).count()
+    needs_paused = Need.objects.filter(status=NeedStatus.PAUSED).count()
     needs_expired = Need.objects.filter(status=NeedStatus.EXPIRED).count()
     needs_fulfilled = Need.objects.filter(status=NeedStatus.FULFILLED).count()
 
@@ -44,6 +67,10 @@ def get_dashboard_metrics() -> dict:
     inventory_available = InventoryItem.objects.filter(
         status=InventoryStatus.AVAILABLE
     ).count()
+    inventory_inactive = InventoryItem.objects.filter(
+        status=InventoryStatus.INACTIVE
+    ).count()
+    inventory_sold = InventoryItem.objects.filter(status=InventoryStatus.SOLD).count()
 
     matches_week = Match.objects.filter(created_at__gte=week_ago).count()
     unlocked_week = Match.objects.filter(
@@ -62,6 +89,7 @@ def get_dashboard_metrics() -> dict:
         ).aggregate(total=Sum('price_cop'))['total']
         or Decimal('0')
     )
+    topups_pending = TopupOrder.objects.filter(status=TopupStatus.PENDING).count()
 
     disputes_open = Dispute.objects.filter(status=DisputeStatus.OPEN).count()
     disputes_human = Dispute.objects.filter(status=DisputeStatus.HUMAN_REVIEW).count()
@@ -75,6 +103,14 @@ def get_dashboard_metrics() -> dict:
     ).count()
     approval_rate = (approved / disputes_resolved) if disputes_resolved else 0
 
+    review_disputes_open = ReviewDispute.objects.filter(
+        status=ReviewDispute.Status.OPEN
+    ).count()
+    reviews_total = Review.objects.count()
+    leads_total = Lead.objects.count()
+    unlocks_total = ContactUnlock.objects.count()
+    unlocks_week = ContactUnlock.objects.filter(created_at__gte=week_ago).count()
+
     return {
         'users': {
             'total': users_total,
@@ -86,12 +122,15 @@ def get_dashboard_metrics() -> dict:
         'needs': {
             'total': needs_total,
             'active': needs_active,
+            'paused': needs_paused,
             'expired': needs_expired,
             'fulfilled': needs_fulfilled,
         },
         'inventory': {
             'total_items': inventory_total,
             'available': inventory_available,
+            'inactive': inventory_inactive,
+            'sold': inventory_sold,
         },
         'matches': {
             'generated_last_7_days': matches_week,
@@ -99,18 +138,45 @@ def get_dashboard_metrics() -> dict:
             'unlock_conversion_rate': round(unlock_rate, 3),
             'total': Match.objects.count(),
         },
+        'contacts': {
+            'unlocks_total': unlocks_total,
+            'unlocks_last_7_days': unlocks_week,
+            'leads_total': leads_total,
+        },
         'wallet': {
             'total_wantis_in_circulation': wantis_circulation,
             'total_topup_cop_last_30_days': str(topup_cop),
             'topups_completed': TopupOrder.objects.filter(
                 status=TopupStatus.COMPLETED
             ).count(),
+            'topups_pending': topups_pending,
         },
         'disputes': {
             'open': disputes_open,
             'in_human_review': disputes_human,
             'resolved_last_30_days': disputes_resolved,
             'approval_rate': round(approval_rate, 3),
+            'review_disputes_open': review_disputes_open,
+        },
+        'reviews': {
+            'total': reviews_total,
+            'avg_rating': round(
+                float(Review.objects.aggregate(avg=Avg('rating'))['avg'] or 0), 2
+            ),
+        },
+        'alerts': {
+            'users_pending_verification': users_pending,
+            'disputes_needing_attention': disputes_open + disputes_human,
+            'review_disputes_open': review_disputes_open,
+            'topups_pending': topups_pending,
+            'needs_paused': needs_paused,
+            'inventory_inactive': inventory_inactive,
+        },
+        'trends_last_7_days': {
+            'new_users': _daily_counts(User.objects.all()),
+            'new_needs': _daily_counts(Need.objects.all()),
+            'new_unlocks': _daily_counts(ContactUnlock.objects.all()),
+            'new_matches': _daily_counts(Match.objects.all()),
         },
     }
 

@@ -17,9 +17,9 @@ def create_review(contact_unlock, reviewer, reviewee, rating: int, comment='', t
     if reviewee.id not in (contact_unlock.buyer_id, contact_unlock.seller_id):
         raise ValidationError('Reviewee inválido')
     if reviewer.id == reviewee.id:
-        raise ValidationError('No podés calificarte a vos mismo')
+        raise ValidationError('No puedes calificarte a ti mismo')
     if contact_unlock.outcome == ContactOutcome.PENDING:
-        raise ValidationError('Debés reportar el outcome antes de calificar')
+        raise ValidationError('Debes reportar el outcome antes de calificar')
     if not 1 <= int(rating) <= 5:
         raise ValidationError('Rating debe ser entre 1 y 5')
     if Review.objects.filter(contact_unlock=contact_unlock, reviewer=reviewer).exists():

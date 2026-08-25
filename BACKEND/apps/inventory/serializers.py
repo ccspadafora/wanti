@@ -48,7 +48,9 @@ class InventoryCreateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True, default='')
     price_cop = serializers.DecimalField(max_digits=15, decimal_places=2, min_value=0)
     city = serializers.CharField(max_length=100)
-    location = LatLngField()
+    department = serializers.CharField(max_length=100, required=False, allow_blank=True, default='')
+    geo_city_id = serializers.UUIDField(required=False, allow_null=True)
+    location = LatLngField(required=False)
     detail = serializers.DictField(required=False, default=dict)
     images = InventoryImageInputSerializer(many=True, required=False, default=list)
 
@@ -59,7 +61,9 @@ class InventoryCreateSerializer(serializers.Serializer):
             'description': self.validated_data.get('description', ''),
             'price_cop': self.validated_data['price_cop'],
             'city': self.validated_data['city'],
-            'location': self.validated_data['location'],
+            'department': self.validated_data.get('department', ''),
+            'geo_city_id': self.validated_data.get('geo_city_id'),
+            'location': self.validated_data.get('location'),
             'detail': self.validated_data.get('detail') or {},
             'images': self.validated_data.get('images') or [],
         }
@@ -104,6 +108,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     vehicle = VehicleItemSerializer(read_only=True)
     property = PropertyItemSerializer(read_only=True)
     detail = serializers.SerializerMethodField()
+    matches_count = serializers.SerializerMethodField()
 
     class Meta:
         model = InventoryItem
@@ -118,6 +123,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             'status',
             'views_count',
             'unlock_count',
+            'matches_count',
             'images',
             'vehicle',
             'property',
@@ -134,12 +140,18 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             return PropertyItemSerializer(obj.property).data
         return None
 
+    def get_matches_count(self, obj):
+        if hasattr(obj, 'matches_count'):
+            return obj.matches_count
+        return obj.matches.exclude(status='DISCARDED').count()
+
 
 class InventoryListSerializer(serializers.ModelSerializer):
     location = LatLngField()
     images = InventoryImageSerializer(many=True, read_only=True)
     vehicle = VehicleItemSerializer(read_only=True)
     property = PropertyItemSerializer(read_only=True)
+    matches_count = serializers.SerializerMethodField()
 
     class Meta:
         model = InventoryItem
@@ -152,12 +164,18 @@ class InventoryListSerializer(serializers.ModelSerializer):
             'location',
             'status',
             'unlock_count',
+            'matches_count',
             'images',
             'vehicle',
             'property',
             'created_at',
         )
         read_only_fields = fields
+
+    def get_matches_count(self, obj):
+        if hasattr(obj, 'matches_count'):
+            return obj.matches_count
+        return obj.matches.exclude(status='DISCARDED').count()
 
 
 class InventoryStatusSerializer(serializers.ModelSerializer):

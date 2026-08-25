@@ -29,7 +29,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         await auth.refreshMe();
         if (auth.needsEmailVerification) {
           throw ApiException(
-            message: 'Todavía no verificamos tu correo. Tocá "Reenviar enlace".',
+            message:
+                'Todavía no verificamos tu correo. Si no te llega el email, toca "Reenviar enlace" '
+                'o contacta soporte.',
           );
         }
       }
@@ -37,7 +39,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       context.go('/verify-phone');
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.displayMessage)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -53,8 +55,8 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
         SnackBar(
           content: Text(
             token != null
-                ? 'Enlace listo (modo local). Tocá "Ya verifiqué mi correo".'
-                : 'Enlace reenviado. Revisá tu bandeja.',
+                ? 'Enlace listo (modo local). Toca "Ya verifiqué mi correo".'
+                : 'Enlace reenviado. Revisa tu bandeja.',
           ),
         ),
       );
@@ -117,7 +119,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                           const SizedBox(height: 12),
                           Text(
                             'Enviamos un enlace de activación a tu correo electrónico. '
-                            'Revisá tu bandeja de entrada y la carpeta de spam.',
+                            'Revisa tu bandeja de entrada y la carpeta de spam.',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.nunito(
                               fontSize: 15,

@@ -61,11 +61,20 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
       ContactUnlockModel? unlock;
       if (widget.unlockId != null && widget.unlockId!.isNotEmpty) {
         unlock = await contactsRepo.findUnlock(widget.unlockId!);
+        unlock ??= await contactsRepo.findUnlock(widget.unlockId!, role: 'seller');
       }
       if (unlock == null) {
-        final unlocks = await contactsRepo.listUnlocks();
-        unlock = unlocks.where((u) => u.matchId == match.id).firstOrNull ??
-            unlocks.where((u) => u.itemTitle == match.itemTitle).firstOrNull;
+        unlock = await contactsRepo.findUnlockByMatch(widget.matchId);
+      }
+      if (unlock == null) {
+        final buyerUnlocks = await contactsRepo.listUnlocks(role: 'buyer');
+        unlock = buyerUnlocks.where((u) => u.matchId == match.id).firstOrNull ??
+            buyerUnlocks.where((u) => u.itemTitle == match.itemTitle).firstOrNull;
+      }
+      if (unlock == null) {
+        final sellerUnlocks = await contactsRepo.listUnlocks(role: 'seller');
+        unlock = sellerUnlocks.where((u) => u.matchId == match.id).firstOrNull ??
+            sellerUnlocks.where((u) => u.itemTitle == match.itemTitle).firstOrNull;
       }
 
       if (!mounted) return;
@@ -104,7 +113,9 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
 
   String get _whatsappMessage {
     final item = _match?.itemTitle ?? _unlock?.itemTitle ?? 'tu publicación';
-    return 'Hola $_sellerName, te contacto desde Wanti por “$item”. ¿Seguís disponible?';
+    final seller = _sellerName.split(' ').first;
+    // Buyer contacting seller after unlock
+    return 'Hola $seller, vi tu publicación “$item” en Wanti. ¿Sigues disponible?';
   }
 
   Future<void> _openWhatsApp() async {
@@ -130,7 +141,7 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo abrir WhatsApp. Verificá que esté instalado.'),
+          content: Text('No se pudo abrir WhatsApp. Verifica que esté instalado.'),
         ),
       );
     }
@@ -159,6 +170,9 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Gracias por tu feedback')),
       );
+      if (outcome == 'PURCHASED' || outcome == 'NOT_PURCHASED') {
+        await _promptReview(unlockId);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _outcome = null);
@@ -168,40 +182,94 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
     }
   }
 
-  Future<void> _dispute() async {
-    final unlockId = _unlock?.id ?? widget.unlockId;
-    if (unlockId == null || unlockId.isEmpty) return;
+  Future<void> _promptReview(String unlockId) async {
+    var rating = 5;
+    final comment = TextEditingController();
+    final selected = <String>{};
+    List<({String code, String label})> tags = const [];
+    try {
+      tags = await context.read<ContactsRepository>().reviewTags(
+            forRole: 'BUYER_REVIEWING_SELLER',
+          );
+    } catch (_) {}
+    if (!mounted) return;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Reportar disputa', style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
-        content: Text(
-          'Vas a solicitar reembolso por lead inválido. ¿Continuar?',
-          style: GoogleFonts.nunito(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text('Deja una reseña', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('¿Cómo fue la experiencia?', style: GoogleFonts.nunito()),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    final value = i + 1;
+                    return IconButton(
+                      onPressed: () => setLocal(() => rating = value),
+                      icon: Icon(
+                        value <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                        color: WantiColors.warning,
+                      ),
+                    );
+                  }),
+                ),
+                if (tags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: tags.map((t) {
+                      final sel = selected.contains(t.code);
+                      return FilterChip(
+                        label: Text(t.label, style: GoogleFonts.nunito(fontSize: 12)),
+                        selected: sel,
+                        onSelected: (v) => setLocal(() {
+                          if (v) {
+                            selected.add(t.code);
+                          } else {
+                            selected.remove(t.code);
+                          }
+                        }),
+                      );
+                    }).toList(),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  controller: comment,
+                  maxLines: 2,
+                  decoration: const InputDecoration(hintText: 'Comentario (opcional)'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Ahora no')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Enviar')),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Reportar')),
-        ],
       ),
     );
     if (ok != true || !mounted) return;
-    setState(() => _busy = true);
     try {
-      await context.read<ContactsRepository>().createDispute(
+      await context.read<ContactsRepository>().createReview(
             unlockId,
-            reason: 'CONTACT_INVALID',
-            details: 'Lead inválido reportado desde la app',
+            rating: rating,
+            comment: comment.text.trim(),
+            tags: selected.toList(),
           );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Disputa enviada')),
+        const SnackBar(content: Text('Reseña enviada')),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -252,7 +320,7 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Lead desbloqueado. Ya podés ver el ítem y hablar con el vendedor.',
+                                      'Lead desbloqueado. Ya puedes ver el ítem y hablar con el vendedor.',
                                       style: GoogleFonts.nunito(
                                         fontSize: 13,
                                         fontWeight: FontWeight.w700,
@@ -407,6 +475,14 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
                                             ),
                                           ),
                                         ),
+                                        if ((_unlock?.sellerEmail ?? '').isNotEmpty)
+                                          Text(
+                                            _unlock!.sellerEmail!,
+                                            style: GoogleFonts.nunito(
+                                              fontSize: 13,
+                                              color: WantiColors.inkFaint,
+                                            ),
+                                          ),
                                         const SizedBox(height: 6),
                                         Container(
                                           padding: const EdgeInsets.symmetric(
@@ -529,17 +605,38 @@ class _ContactUnlockedScreenState extends State<ContactUnlockedScreen> {
                               ],
                             ),
                             const SizedBox(height: 20),
-                            TextButton(
-                              onPressed:
-                                  _busy || (_unlock?.canOpenDispute == false) ? null : _dispute,
-                              child: Text(
-                                'Lead inválido → Reportar disputa y solicitar reembolso',
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.nunito(
-                                  color: WantiColors.error,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13,
-                                ),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: WantiColors.surfaceSoft,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: WantiColors.borderLight),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Aquí ves el contacto del vendedor. Las disputas hacia ti '
+                                    'aparecen en Disputas; para impugnar una reseña usa Mis reseñas.',
+                                    style: GoogleFonts.nunito(
+                                      fontSize: 12,
+                                      color: WantiColors.inkMuted,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextButton(
+                                    onPressed: () => context.push('/profile/reviews'),
+                                    child: Text(
+                                      'Ir a Mis reseñas',
+                                      style: GoogleFonts.nunito(
+                                        fontWeight: FontWeight.w800,
+                                        color: WantiColors.tealDark,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],

@@ -4,8 +4,12 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services.audit_log import log_audit_event
-from apps.common.constants import DisputeStatus, TransactionType
-from apps.common.exceptions import ConflictError, DisputeStateError, PermissionError
+from apps.common.constants import (
+    DisputeStatus,
+    SELLER_DISPUTE_REASONS,
+    TransactionType,
+)
+from apps.common.exceptions import ConflictError, DisputeStateError, PermissionError, ValidationError
 from apps.common.services.settings_service import get_setting
 from apps.contacts.models import ContactUnlock
 from apps.disputes.models import Dispute, DisputeEvent
@@ -21,10 +25,37 @@ def _add_event(dispute, event_type, actor=None, payload=None):
     )
 
 
+def _refund_recipient(unlock: ContactUnlock):
+    """Reembolsa a quien pagó el desbloqueo (vendedor)."""
+    txn = getattr(unlock, 'wallet_transaction', None)
+    if txn is not None and getattr(txn, 'wallet', None) is not None:
+        return txn.wallet.user
+    return unlock.seller
+
+
+def _allowed_reasons_for(opened_by, contact_unlock: ContactUnlock):
+    payer = _refund_recipient(contact_unlock)
+    # Solo quien pagó Wanti (vendedor) puede abrir disputa de contacto/reembolso.
+    if opened_by.id != payer.id:
+        return set()
+    return SELLER_DISPUTE_REASONS
+
+
 @transaction.atomic
 def open_dispute(contact_unlock: ContactUnlock, opened_by, reason: str, description='') -> Dispute:
     if opened_by.id not in (contact_unlock.buyer_id, contact_unlock.seller_id):
         raise PermissionError()
+    payer = _refund_recipient(contact_unlock)
+    if opened_by.id != payer.id:
+        raise PermissionError(
+            'Solo quien gastó Wanti en el desbloqueo puede abrir una disputa de reembolso. '
+            'Si eres comprador, puedes impugnar reseñas desde Mis reseñas.'
+        )
+    allowed = _allowed_reasons_for(opened_by, contact_unlock)
+    if reason not in allowed:
+        raise ValidationError(
+            'El motivo no aplica para disputas de contacto/Wanti.'
+        )
     active = Dispute.objects.filter(
         contact_unlock=contact_unlock,
         status__in=[
@@ -44,16 +75,21 @@ def open_dispute(contact_unlock: ContactUnlock, opened_by, reason: str, descript
         description=description,
         status=DisputeStatus.OPEN,
     )
-    _add_event(dispute, 'OPENED', actor=opened_by)
+    _add_event(
+        dispute,
+        'OPENED',
+        actor=opened_by,
+        payload={'role': 'seller', 'reason': reason, 'payer': True},
+    )
     log_audit_event(
         actor_user=opened_by,
         action='DISPUTE_OPENED',
         entity='Dispute',
         entity_id=dispute.id,
+        metadata={'role': 'seller'},
     )
-    from apps.disputes.tasks import start_auto_review
-
-    start_auto_review.delay(str(dispute.id))
+    # Disputas de Wanti (vendedor): revisión humana directa.
+    _escalate_to_human(dispute)
     return dispute
 
 
@@ -110,10 +146,20 @@ def _escalate_to_human(dispute: Dispute) -> Dispute:
 
 @transaction.atomic
 def approve_dispute(dispute: Dispute, admin_user, resolution_note='') -> Dispute:
+    dispute = Dispute.objects.select_for_update().select_related(
+        'contact_unlock',
+        'contact_unlock__wallet_transaction',
+        'contact_unlock__wallet_transaction__wallet',
+        'contact_unlock__wallet_transaction__wallet__user',
+        'refund_transaction',
+    ).get(pk=dispute.pk)
+    if dispute.status == DisputeStatus.APPROVED and dispute.refund_transaction_id:
+        return dispute
     if dispute.status not in (DisputeStatus.HUMAN_REVIEW, DisputeStatus.APPEALED):
         raise DisputeStateError()
     unlock = dispute.contact_unlock
-    wallet = get_or_create_wallet(unlock.buyer)
+    payer = _refund_recipient(unlock)
+    wallet = get_or_create_wallet(payer)
     refund_txn = apply_transaction(
         wallet=wallet,
         transaction_type=TransactionType.REFUND,
@@ -121,6 +167,7 @@ def approve_dispute(dispute: Dispute, admin_user, resolution_note='') -> Dispute
         related_object=dispute,
         note=f'Reembolso disputa {dispute.id}',
         created_by=admin_user,
+        idempotency_key=f'dispute-refund:{dispute.id}',
     )
     appeal_days = get_setting('DISPUTE_APPEAL_DAYS', 7)
     dispute.status = DisputeStatus.APPROVED
@@ -136,7 +183,7 @@ def approve_dispute(dispute: Dispute, admin_user, resolution_note='') -> Dispute
         action='DISPUTE_RESOLVED',
         entity='Dispute',
         entity_id=dispute.id,
-        metadata={'result': 'APPROVED'},
+        metadata={'result': 'APPROVED', 'refund_user_id': str(payer.id)},
     )
     from apps.notifications.tasks import notify_dispute_resolved
 
@@ -170,7 +217,15 @@ def reject_dispute(dispute: Dispute, admin_user, resolution_note='') -> Dispute:
 def cancel_dispute(dispute: Dispute, actor) -> Dispute:
     if dispute.opened_by_id != actor.id:
         raise PermissionError()
-    if dispute.status not in (DisputeStatus.OPEN, DisputeStatus.AUTO_REVIEW):
+    cancellable = dispute.status in (DisputeStatus.OPEN, DisputeStatus.AUTO_REVIEW)
+    # Disputas de vendedor saltan a HUMAN_REVIEW; se pueden cancelar si aún no hay resolución.
+    if (
+        dispute.status == DisputeStatus.HUMAN_REVIEW
+        and not dispute.resolved_at
+        and not dispute.resolved_by_id
+    ):
+        cancellable = True
+    if not cancellable:
         raise DisputeStateError()
     dispute.status = DisputeStatus.CANCELLED
     dispute.save(update_fields=['status', 'updated_at'])

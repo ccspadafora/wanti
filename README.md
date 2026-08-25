@@ -3,7 +3,7 @@
 
 ## Descripción del Proyecto
 
-Wanti es una aplicación móvil de **marketplace inverso** para vehículos e inmuebles. A diferencia de un clasificado tradicional, aquí **el comprador publica su necesidad** (presupuesto, características obligatorias y preferencias, ubicación) y los **vendedores** encuentran esas necesidades, envían ofertas y **pagan con la moneda interna "Wantis" para desbloquear el contacto del comprador interesado**.
+Wanti es una aplicación móvil de **marketplace inverso** para vehículos e inmuebles. A diferencia de un clasificado tradicional, aquí **el comprador publica su necesidad** (presupuesto, características obligatorias y preferencias, ubicación) y los **vendedores** encuentran esas necesidades, envían ofertas y **pagan con la moneda interna "Wanti" para desbloquear el contacto del comprador interesado**.
 
 El sistema incorpora un motor de coincidencias con scoring geoespacial, una billetera interna con paquetes de recarga, un módulo de disputas y reembolsos, calificaciones bidireccionales, un CRM de leads para el vendedor y un panel administrativo con métricas y moderación.
 
@@ -18,6 +18,7 @@ El sistema incorpora un motor de coincidencias con scoring geoespacial, una bill
 Arquitectura cliente-servidor desacoplada y escalable:
 
 - **Frontend Mobile:** Flutter (iOS / Android)
+- **Panel Admin Web:** React + Vite (`ADMIN/`) — producción: `http://67.202.17.248/panel/`
 - **Backend API:** Python (Django 5.x + Django REST Framework)
 - **Base de Datos:** PostgreSQL 15+ con PostGIS 3.4+ (consultas geoespaciales)
 - **Autenticación:** JWT + verificación de correo + OTP por WhatsApp/SMS (Twilio)
@@ -64,8 +65,8 @@ Arquitectura cliente-servidor desacoplada y escalable:
 
 ### Sistema de diseño (app móvil)
 - **Paleta:** navy `#0A1F44`, teal `#00B2A9`, ámbar `#EF9F27`
-- **Tipografía:** Nunito (interfaz) / JetBrains Mono (datos numéricos: Wantis, precios, porcentajes de match)
-- **Tono de copy:** voseo colombiano ("Podés publicar", "Ingresá el código")
+- **Tipografía:** Nunito (interfaz) / JetBrains Mono (datos numéricos: Wanti, precios, porcentajes de match)
+- **Tono de copy:** español de Colombia con tuteo ("Puedes publicar", "Ingresa el código"). Marca y moneda: **Wanti** (nunca "Wantis" / "1T").
 
 ---
 
@@ -82,7 +83,7 @@ Arquitectura cliente-servidor desacoplada y escalable:
 │   │   ├── inventory/           # Inventario del vendedor
 │   │   ├── offers/              # Ofertas del vendedor a una necesidad
 │   │   ├── matching/            # Motor de coincidencias y scoring
-│   │   ├── wallet/              # Wantis, recargas y transacciones
+│   │   ├── wallet/              # Wanti, recargas y transacciones
 │   │   ├── contacts/            # Desbloqueo de contactos
 │   │   ├── disputes/            # Disputas y reembolsos
 │   │   ├── reviews/             # Calificaciones y reseñas
@@ -122,7 +123,7 @@ Producción: copiar `.env.production.example` → `.env.production`, colocar cer
 - Toda FK a usuario usa `settings.AUTH_USER_MODEL`
 - **Borrados lógicos** (cambio de estado), nunca `DELETE` físico en entidades de negocio
 - Montos en COP: `DecimalField(max_digits=15, decimal_places=2)`
-- Saldos de Wantis: `IntegerField` — unidades enteras, nunca fracciones
+- Saldos de Wanti: `IntegerField` — unidades enteras, nunca fracciones
 - Coordenadas: `PointField(srid=4326, geography=True)`
 - Ningún parámetro de negocio se hardcodea: todo se lee desde `SystemSetting`
 
@@ -640,7 +641,7 @@ Paquetes de recarga configurables desde el panel admin.
 
 ### ContactUnlock — HUS18, HUS20
 
-Registro del pago en Wantis que hace **el vendedor** para acceder a los datos de contacto del comprador.
+Registro del pago en Wanti que hace **el vendedor** para acceder a los datos de contacto del comprador.
 
 | Campo | Tipo | Notas |
 |---|---|---|

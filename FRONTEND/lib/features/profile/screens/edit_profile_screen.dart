@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/wanti_colors.dart';
+import '../../../core/utils/colombia_cities.dart';
 import '../../../shared/widgets/wanti_widgets.dart';
 import '../../auth/state/auth_controller.dart';
 
@@ -16,47 +17,28 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
-  late final TextEditingController _name;
-  late final TextEditingController _city;
-  late final TextEditingController _photo;
+  String? _city;
   bool _loading = false;
 
   @override
   void initState() {
     super.initState();
     final user = context.read<AuthController>().user;
-    _name = TextEditingController(text: user?.fullName ?? '');
-    _city = TextEditingController(text: user?.city ?? '');
-    _photo = TextEditingController(text: user?.profilePhotoUrl ?? '');
-  }
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _city.dispose();
-    _photo.dispose();
-    super.dispose();
+    _city = ColombiaCities.normalize(user?.city) ??
+        (ColombiaCities.all.contains(user?.city) ? user!.city : null);
   }
 
   Future<void> _save() async {
-    if (_name.text.trim().isEmpty) {
-      _toast('Ingresá tu nombre completo');
-      return;
-    }
-    if (_city.text.trim().isEmpty) {
-      _toast('Ingresá tu ciudad');
+    if (_city == null || _city!.isEmpty) {
+      _toast('Selecciona tu ciudad');
       return;
     }
     setState(() => _loading = true);
     try {
-      await context.read<AuthController>().updateProfile(
-            fullName: _name.text.trim(),
-            city: _city.text.trim(),
-            profilePhotoUrl: _photo.text.trim().isEmpty ? '' : _photo.text.trim(),
-          );
+      await context.read<AuthController>().updateProfile(city: _city!);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Perfil actualizado')),
+        const SnackBar(content: Text('Ciudad actualizada')),
       );
       context.pop();
     } on ApiException catch (e) {
@@ -73,32 +55,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthController>().user;
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            const ScreenHeader(title: 'Editar datos'),
+            const ScreenHeader(title: 'Editar ciudad'),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                 children: [
                   Text(
-                    'Estos datos se muestran a compradores y vendedores cuando hay un match.',
+                    'Solo puedes cambiar tu ciudad desde la app. '
+                    'Nombre, correo y teléfono son datos de autenticación: '
+                    'para actualizarlos contacta al equipo de 1T.',
                     style: GoogleFonts.nunito(color: WantiColors.inkMuted, height: 1.4),
                   ),
                   const SizedBox(height: 20),
-                  WantiField(label: 'Nombre completo', controller: _name),
+                  Text(
+                    'Nombre',
+                    style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w700,
+                      color: WantiColors.inkMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: WantiColors.surfaceSoft,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: WantiColors.borderLight),
+                    ),
+                    child: Text(
+                      user?.fullName ?? '',
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w600,
+                        color: WantiColors.inkFaint,
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 14),
-                  WantiField(label: 'Ciudad', controller: _city),
-                  const SizedBox(height: 14),
-                  WantiField(
-                    label: 'URL de foto (opcional)',
-                    controller: _photo,
-                    hint: 'https://...',
-                    keyboardType: TextInputType.url,
+                  WantiDropdown<String>(
+                    label: 'Ciudad',
+                    value: _city,
+                    hint: 'Selecciona',
+                    items: ColombiaCities.all
+                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                        .toList(),
+                    onChanged: (v) => setState(() => _city = v),
                   ),
                   const SizedBox(height: 28),
-                  WantiButton(label: 'Guardar cambios', loading: _loading, onPressed: _save),
+                  WantiButton(label: 'Guardar ciudad', loading: _loading, onPressed: _save),
                 ],
               ),
             ),

@@ -4,28 +4,47 @@ from apps.audit.services.audit_log import log_audit_event
 from apps.common.constants import AssetType, InventoryStatus
 from apps.common.exceptions import PermissionError, UserNotVerifiedError, ValidationError
 from apps.common.integrations.ai_images.base import generate_images
+from apps.geo.services import resolve_geo_location
 from apps.inventory.models import InventoryImage, InventoryItem, PropertyItem, VehicleItem
 
 
+def _filter_model_fields(model, data: dict) -> dict:
+    allowed = {f.name for f in model._meta.fields if f.name not in {'need', 'item'}}
+    return {k: v for k, v in data.items() if k in allowed}
+
+
 @transaction.atomic
-def create_inventory_item(seller, data: dict) -> InventoryItem:
-    if not seller.can_publish:
+def create_inventory_item(seller, data: dict, *, bypass_verification: bool = False) -> InventoryItem:
+    if not bypass_verification and not seller.can_publish:
         raise UserNotVerifiedError()
+    geo = resolve_geo_location(
+        department=data.get('department'),
+        city=data.get('city'),
+        geo_city_id=data.get('geo_city_id'),
+        location=data.get('location'),
+    )
     item = InventoryItem.objects.create(
         seller=seller,
         asset_type=data['asset_type'],
         title=data['title'],
         description=data.get('description', ''),
         price_cop=data['price_cop'],
-        city=data['city'],
-        location=data['location'],
+        city=geo['city'],
+        department=geo['department'],
+        geo_city=geo['geo_city'],
+        location=geo['location'],
         status=InventoryStatus.AVAILABLE,
     )
     detail = data.get('detail') or {}
     if item.asset_type == AssetType.VEHICLE:
-        VehicleItem.objects.create(item=item, **detail)
+        catalog_version_id = detail.get('catalog_version_id')
+        if catalog_version_id:
+            from apps.catalog.services.version_specs import validate_detail_against_version
+
+            validate_detail_against_version(catalog_version_id, detail)
+        VehicleItem.objects.create(item=item, **_filter_model_fields(VehicleItem, detail))
     else:
-        PropertyItem.objects.create(item=item, **detail)
+        PropertyItem.objects.create(item=item, **_filter_model_fields(PropertyItem, detail))
     for image in data.get('images') or []:
         InventoryImage.objects.create(item=item, **image)
     log_audit_event(
@@ -103,6 +122,36 @@ def deactivate(item: InventoryItem, seller) -> InventoryItem:
         raise PermissionError()
     item.status = InventoryStatus.INACTIVE
     item.save(update_fields=['status', 'updated_at'])
+    return item
+
+
+@transaction.atomic
+def admin_deactivate_item(item: InventoryItem, actor_user, reason: str = '') -> InventoryItem:
+    item.status = InventoryStatus.INACTIVE
+    item.save(update_fields=['status', 'updated_at'])
+    log_audit_event(
+        actor_user=actor_user,
+        action='INVENTORY_ADMIN_DEACTIVATED',
+        entity='InventoryItem',
+        entity_id=item.id,
+        metadata={'reason': reason},
+    )
+    return item
+
+
+@transaction.atomic
+def admin_reactivate_item(item: InventoryItem, actor_user) -> InventoryItem:
+    item.status = InventoryStatus.AVAILABLE
+    item.save(update_fields=['status', 'updated_at'])
+    log_audit_event(
+        actor_user=actor_user,
+        action='INVENTORY_ADMIN_REACTIVATED',
+        entity='InventoryItem',
+        entity_id=item.id,
+    )
+    from apps.matching.tasks import run_match_for_item_task
+
+    run_match_for_item_task.delay(str(item.id))
     return item
 
 

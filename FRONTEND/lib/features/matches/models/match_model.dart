@@ -51,6 +51,9 @@ class MatchModel {
     this.propertySummary,
     this.unlockId,
     this.sellerPhone,
+    this.buyerPhone,
+    this.buyerEmail,
+    this.leadId,
     this.itemDescription,
     this.itemYear,
     this.itemColor,
@@ -81,6 +84,9 @@ class MatchModel {
   final String? propertySummary;
   final String? unlockId;
   final String? sellerPhone;
+  final String? buyerPhone;
+  final String? buyerEmail;
+  final String? leadId;
   final String? itemDescription;
   final int? itemYear;
   final String? itemColor;
@@ -178,6 +184,9 @@ class MatchModel {
       propertySummary: propertySummary,
       unlockId: json['unlock_id']?.toString(),
       sellerPhone: json['seller_phone']?.toString(),
+      buyerPhone: json['buyer_phone']?.toString(),
+      buyerEmail: json['buyer_email']?.toString(),
+      leadId: json['lead_id']?.toString(),
       itemDescription: item?['description']?.toString(),
       itemYear: int.tryParse(vehicle?['year']?.toString() ?? ''),
       itemColor: vehicle?['color']?.toString(),

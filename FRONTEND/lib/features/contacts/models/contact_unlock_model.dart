@@ -7,8 +7,12 @@ class ContactUnlockModel {
     this.score,
     this.sellerName,
     this.sellerPhone,
+    this.sellerEmail,
     this.sellerRating,
     this.sellerIsNew = false,
+    this.buyerName,
+    this.buyerPhone,
+    this.buyerEmail,
     this.itemTitle,
     this.itemPrice,
     this.itemCity,
@@ -26,8 +30,12 @@ class ContactUnlockModel {
   final int? score;
   final String? sellerName;
   final String? sellerPhone;
+  final String? sellerEmail;
   final double? sellerRating;
   final bool sellerIsNew;
+  final String? buyerName;
+  final String? buyerPhone;
+  final String? buyerEmail;
   final String? itemTitle;
   final double? itemPrice;
   final String? itemCity;
@@ -58,6 +66,9 @@ class ContactUnlockModel {
     final seller = json['seller'] is Map
         ? Map<String, dynamic>.from(json['seller'] as Map)
         : null;
+    final buyer = json['buyer'] is Map
+        ? Map<String, dynamic>.from(json['buyer'] as Map)
+        : null;
     final item = json['inventory_item'] is Map
         ? Map<String, dynamic>.from(json['inventory_item'] as Map)
         : null;
@@ -69,8 +80,12 @@ class ContactUnlockModel {
       outcome: json['outcome']?.toString() ?? 'PENDING',
       sellerName: seller?['full_name']?.toString(),
       sellerPhone: seller?['phone']?.toString(),
+      sellerEmail: seller?['email']?.toString(),
       sellerRating: double.tryParse(seller?['rating_average']?.toString() ?? ''),
       sellerIsNew: seller?['is_new_user'] == true,
+      buyerName: buyer?['full_name']?.toString(),
+      buyerPhone: buyer?['phone']?.toString(),
+      buyerEmail: buyer?['email']?.toString(),
       itemTitle: item?['title']?.toString(),
       itemPrice: double.tryParse(item?['price_cop']?.toString() ?? ''),
       itemCity: item?['city']?.toString(),

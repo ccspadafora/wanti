@@ -44,7 +44,39 @@ class Need(BaseModel):
         blank=True,
         verbose_name='Descripción de la permuta',
     )
+    trade_in_item = models.ForeignKey(
+        'inventory.InventoryItem',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='needs_as_trade_in',
+        verbose_name='Inventario ofrecido en permuta',
+    )
     city = models.CharField(max_length=100, verbose_name='Ciudad')
+    department = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='Departamento',
+    )
+    geo_city = models.ForeignKey(
+        'geo.GeoCity',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='needs',
+        verbose_name='Ciudad (catálogo)',
+    )
+    willing_to_travel = models.BooleanField(
+        default=False,
+        verbose_name='Dispuesto a desplazarse a otras ciudades',
+    )
+    travel_cities = models.ManyToManyField(
+        'geo.GeoCity',
+        blank=True,
+        related_name='needs_as_travel',
+        verbose_name='Ciudades de desplazamiento',
+    )
     location = models.PointField(
         srid=4326,
         geography=True,

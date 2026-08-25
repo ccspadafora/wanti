@@ -34,6 +34,8 @@ INSTALLED_APPS = [
     "apps.health",
     "apps.needs",
     "apps.inventory",
+    "apps.catalog",
+    "apps.geo",
     "apps.matching",
     "apps.wallet",
     "apps.contacts",
@@ -184,6 +186,22 @@ CELERY_BEAT_SCHEDULE = {
     },
 }
 TWILIO_ENABLED = os.getenv("TWILIO_ENABLED", "false").lower() in ("1", "true", "yes")
+ONESIGNAL_ENABLED = os.getenv("ONESIGNAL_ENABLED", "false").lower() in ("1", "true", "yes")
+ONESIGNAL_APP_ID = os.getenv("ONESIGNAL_APP_ID", "")
+ONESIGNAL_REST_API_KEY = os.getenv("ONESIGNAL_REST_API_KEY", "")
+
+# Pagos / recargas
+PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "sandbox").strip().lower()
+PAYMENT_WEBHOOK_SECRET = os.getenv("PAYMENT_WEBHOOK_SECRET", "")
+PAYMENT_WEBHOOK_URL = os.getenv("PAYMENT_WEBHOOK_URL", "")
+PAYMENT_AUTO_COMPLETE = os.getenv("PAYMENT_AUTO_COMPLETE", "false").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+BOLT_API_URL = os.getenv("BOLT_API_URL", "")
+BOLT_API_KEY = os.getenv("BOLT_API_KEY", "")
+
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )
@@ -194,6 +212,16 @@ EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() in ("1", "true", "yes")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "no-reply@wanti.co")
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
+
+# Demo/staging: si no hay SMTP real, el registro marca el email como verificado
+# para no bloquear el onboarding. Forzar con AUTO_VERIFY_EMAIL=true|false.
+_auto_verify_email = os.getenv("AUTO_VERIFY_EMAIL", "").strip().lower()
+if _auto_verify_email in ("1", "true", "yes"):
+    AUTO_VERIFY_EMAIL = True
+elif _auto_verify_email in ("0", "false", "no"):
+    AUTO_VERIFY_EMAIL = False
+else:
+    AUTO_VERIFY_EMAIL = EMAIL_BACKEND.endswith("console.EmailBackend")
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 GDAL_LIBRARY_PATH = os.getenv("GDAL_LIBRARY_PATH")
 GEOS_LIBRARY_PATH = os.getenv("GEOS_LIBRARY_PATH")

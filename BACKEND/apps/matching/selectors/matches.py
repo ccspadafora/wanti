@@ -18,7 +18,15 @@ def list_alerts_for_seller(seller):
     return (
         Match.objects.filter(seller=seller)
         .exclude(status=MatchStatus.DISCARDED)
-        .select_related('need', 'buyer', 'inventory_item')
+        .select_related(
+            'need',
+            'buyer',
+            'inventory_item',
+            'inventory_item__vehicle',
+            'inventory_item__property',
+            'unlock',
+            'unlock__lead',
+        )
         .order_by('-created_at')
     )
 
@@ -34,6 +42,7 @@ def get_match_detail(match_id, actor_user) -> Match:
                 'inventory_item__vehicle',
                 'inventory_item__property',
                 'unlock',
+                'unlock__lead',
             )
             .prefetch_related('inventory_item__images', 'criteria_results')
             .get(pk=match_id)

@@ -32,10 +32,15 @@ class ContactUnlockListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        role = request.query_params.get('role', 'buyer')
+        if role == 'seller':
+            qs = ContactUnlock.objects.filter(seller=request.user)
+        else:
+            qs = ContactUnlock.objects.filter(buyer=request.user)
         qs = (
-            ContactUnlock.objects.filter(buyer=request.user)
-            .select_related(
+            qs.select_related(
                 'seller',
+                'buyer',
                 'match',
                 'match__inventory_item',
                 'match__inventory_item__vehicle',
@@ -43,6 +48,9 @@ class ContactUnlockListView(APIView):
             )
             .order_by('-created_at')
         )
+        inventory_item_id = request.query_params.get('inventory_item_id')
+        if inventory_item_id:
+            qs = qs.filter(match__inventory_item_id=inventory_item_id)
         outcome = request.query_params.get('outcome')
         if outcome:
             qs = qs.filter(outcome=outcome)

@@ -24,9 +24,10 @@ def _get_seller_lead(lead_id, seller):
                 'buyer',
                 'contact_unlock',
                 'contact_unlock__match',
+                'contact_unlock__match__need',
                 'contact_unlock__match__inventory_item',
             )
-            .prefetch_related('notes')
+            .prefetch_related('notes', 'notes__author')
             .get(pk=lead_id)
         )
     except Lead.DoesNotExist as exc:
@@ -46,6 +47,7 @@ class LeadListView(APIView):
                 'buyer',
                 'contact_unlock',
                 'contact_unlock__match',
+                'contact_unlock__match__need',
                 'contact_unlock__match__inventory_item',
             )
             .annotate(notes_count=Count('notes'))
@@ -53,9 +55,13 @@ class LeadListView(APIView):
         stage = request.query_params.get('stage')
         if stage:
             qs = qs.filter(stage=stage)
-        search = request.query_params.get('search')
+        search = request.query_params.get('search') or request.query_params.get('q')
         if search:
-            qs = qs.filter(Q(buyer__full_name__icontains=search))
+            qs = qs.filter(
+                Q(buyer__full_name__icontains=search)
+                | Q(contact_unlock__match__need__title__icontains=search)
+                | Q(contact_unlock__match__inventory_item__title__icontains=search)
+            )
         ordering = request.query_params.get('ordering', '-last_activity_at')
         if ordering.lstrip('-') in ('last_activity_at', 'created_at', 'expires_at'):
             qs = qs.order_by(ordering)

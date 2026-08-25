@@ -8,6 +8,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/state/app_mode_controller.dart';
 import '../../../core/theme/wanti_colors.dart';
 import '../../../shared/widgets/app_drawer.dart';
+import '../../../shared/widgets/gratis_badge.dart';
 import '../../../shared/widgets/wanti_widgets.dart';
 import '../../auth/state/auth_controller.dart';
 import '../../matches/screens/buyer_matches_screen.dart';
@@ -17,8 +18,6 @@ import '../../profile/screens/profile_screen.dart';
 import '../../seller/screens/seller_alerts_screen.dart';
 import '../../seller/screens/seller_home_screen.dart';
 import '../../seller/screens/seller_inventory_screen.dart';
-import '../../wallet/screens/wallet_screen.dart';
-
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key, this.initialTab, this.initialNeedId});
 
@@ -110,7 +109,7 @@ class _HomeShellState extends State<HomeShell> {
                   needId: _matchesNeedId,
                   needFilterToken: _matchesNeedToken,
                 ),
-                const WalletScreen(),
+                const ProfileScreen(),
               ],
       ),
       bottomNavigationBar: Container(
@@ -121,20 +120,32 @@ class _HomeShellState extends State<HomeShell> {
         child: SafeArea(
           top: false,
           child: SizedBox(
-            height: 64,
+            height: 70,
             child: Row(
               children: isSeller
                   ? [
                       _navItem(0, Icons.home_outlined, Icons.home, 'Inicio'),
-                      _navItem(1, Icons.inventory_2_outlined, Icons.inventory_2, 'Inventario'),
+                      _navItem(
+                        1,
+                        Icons.inventory_2_outlined,
+                        Icons.inventory_2,
+                        'Inventario',
+                        showGratis: true,
+                      ),
                       _navItem(2, Icons.notifications_none, Icons.notifications, 'Alertas'),
                       _navItem(3, Icons.person_outline, Icons.person, 'Perfil'),
                     ]
                   : [
                       _navItem(0, Icons.home_outlined, Icons.home, 'Inicio'),
-                      _navItem(1, Icons.add_circle_outline, Icons.add_circle, 'Publicar'),
+                      _navItem(
+                        1,
+                        Icons.add_circle_outline,
+                        Icons.add_circle,
+                        'Publicar',
+                        showGratis: true,
+                      ),
                       _navItem(2, Icons.favorite_border, Icons.favorite, 'Matches'),
-                      _navItem(3, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Wallet'),
+                      _navItem(3, Icons.person_outline, Icons.person, 'Perfil'),
                     ],
             ),
           ),
@@ -143,7 +154,13 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  Widget _navItem(int index, IconData icon, IconData activeIcon, String label) {
+  Widget _navItem(
+    int index,
+    IconData icon,
+    IconData activeIcon,
+    String label, {
+    bool showGratis = false,
+  }) {
     final active = _tab == index;
     final isSeller = context.read<AppModeController>().isSeller;
     return Expanded(
@@ -161,11 +178,16 @@ class _HomeShellState extends State<HomeShell> {
             Container(
               height: 3,
               width: 28,
-              margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
                 color: active ? WantiColors.teal : Colors.transparent,
                 borderRadius: BorderRadius.circular(999),
               ),
+            ),
+            SizedBox(
+              height: 14,
+              child: showGratis
+                  ? const Center(child: GratisBadge(compact: true))
+                  : null,
             ),
             Icon(
               active ? activeIcon : icon,
@@ -175,6 +197,8 @@ class _HomeShellState extends State<HomeShell> {
             const SizedBox(height: 2),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: GoogleFonts.nunito(
                 fontSize: 11,
                 fontWeight: active ? FontWeight.w700 : FontWeight.w400,
@@ -208,6 +232,7 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
   bool _loading = true;
   List<NeedModel> _needs = [];
   String? _error;
+  int? _catalogEpoch;
 
   String get _asset => widget.asset;
 
@@ -266,6 +291,13 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<AuthController>().user;
+    final epoch = context.watch<AppModeController>().catalogEpoch;
+    if (_catalogEpoch != null && _catalogEpoch != epoch) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _load();
+      });
+    }
+    _catalogEpoch = epoch;
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -309,8 +341,8 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
               padding: const EdgeInsets.fromLTRB(24, 28, 24, 12),
               child: Text(
                 _asset == 'VEHICLE'
-                    ? 'Mis necesidades de vehículo'
-                    : 'Mis necesidades de inmueble',
+                    ? 'Mis sueños de vehículo'
+                    : 'Mis sueños de inmueble',
                 style: GoogleFonts.nunito(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
@@ -338,7 +370,7 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  'Todavía no tenés necesidades activas.\nPublicá la primera.',
+                  'Todavía no tienes sueños activos.\nPublica el primero.',
                   style: GoogleFonts.nunito(color: WantiColors.inkMuted, height: 1.4),
                 ),
               ),
@@ -364,12 +396,21 @@ class _BuyerHomeScreenState extends State<BuyerHomeScreen> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
-              child: WantiButton(
-                label: '+ Publicar necesidad',
-                onPressed: () async {
-                  await context.push('/needs/new?asset=$_asset');
-                  _load();
-                },
+              child: Column(
+                children: [
+                  const Align(
+                    alignment: Alignment.centerRight,
+                    child: GratisBadge(),
+                  ),
+                  const SizedBox(height: 8),
+                  WantiButton(
+                    label: '+ Publicar sueño',
+                    onPressed: () async {
+                      await context.push('/needs/new?asset=$_asset');
+                      _load();
+                    },
+                  ),
+                ],
               ),
             ),
           ),
@@ -443,6 +484,25 @@ class _NeedCard extends StatefulWidget {
 
 class _NeedCardState extends State<_NeedCard> {
   bool _renewing = false;
+  bool _toggling = false;
+
+  Future<void> _togglePause() async {
+    setState(() => _toggling = true);
+    try {
+      final repo = context.read<NeedsRepository>();
+      if (widget.need.status == 'PAUSED') {
+        await repo.resume(widget.need.id);
+      } else {
+        await repo.pause(widget.need.id);
+      }
+      await widget.onRenewed();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _toggling = false);
+    }
+  }
 
   Future<void> _confirmRenew() async {
     const renewalDays = 30;
@@ -607,15 +667,19 @@ class _NeedCardState extends State<_NeedCard> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: WantiColors.surfaceTeal,
+                      color: need.status == 'PAUSED'
+                          ? WantiColors.warningLight
+                          : WantiColors.surfaceTeal,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      '${need.matchesCount} matches',
+                      need.status == 'PAUSED' ? 'Pausada' : '${need.matchesCount} matches',
                       style: GoogleFonts.nunito(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: WantiColors.tealDark,
+                        color: need.status == 'PAUSED'
+                            ? WantiColors.warning
+                            : WantiColors.tealDark,
                       ),
                     ),
                   ),
@@ -637,35 +701,76 @@ class _NeedCardState extends State<_NeedCard> {
                     ),
                 ],
               ),
-              if (renewable) ...[
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton(
-                    onPressed: _renewing ? null : _confirmRenew,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: WantiColors.tealDark,
-                      side: const BorderSide(color: WantiColors.teal, width: 1.5),
-                      shape: const StadiumBorder(),
-                      textStyle: GoogleFonts.nunito(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _toggling ? null : _togglePause,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: WantiColors.inkMuted,
+                        side: const BorderSide(color: WantiColors.border),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        _toggling
+                            ? '...'
+                            : (need.status == 'PAUSED' ? 'Reanudar' : 'Pausar'),
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 12),
                       ),
                     ),
-                    child: _renewing
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: WantiColors.teal,
-                            ),
-                          )
-                        : const Text('Renovar publicación'),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final ok = await context.push<bool>(
+                          '/needs/${need.id}/edit',
+                        );
+                        if (ok == true) await widget.onRenewed();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: WantiColors.navy,
+                        side: const BorderSide(color: WantiColors.navy),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: Text(
+                        'Editar',
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 12),
+                      ),
+                    ),
+                  ),
+                  if (renewable) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _renewing ? null : _confirmRenew,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: WantiColors.tealDark,
+                          side: const BorderSide(color: WantiColors.teal, width: 1.5),
+                          shape: const StadiumBorder(),
+                        ),
+                        child: _renewing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: WantiColors.teal,
+                                ),
+                              )
+                            : Text(
+                                'Renovar',
+                                style: GoogleFonts.nunito(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ),

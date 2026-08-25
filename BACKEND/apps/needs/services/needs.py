@@ -7,6 +7,7 @@ from apps.audit.services.audit_log import log_audit_event
 from apps.common.constants import AssetType, NeedStatus
 from apps.common.exceptions import PermissionError, UserNotVerifiedError, ValidationError
 from apps.common.services.settings_service import get_setting
+from apps.geo.services import resolve_geo_location, resolve_travel_city_ids
 from apps.needs.models import Need, NeedCriterion, NeedImage, PropertyNeed, VehicleNeed
 
 
@@ -23,13 +24,61 @@ def _validate_budget_ratio(budget_max_cop, commercial_value=None):
         )
 
 
+def _sync_structural_criteria(need: Need) -> None:
+    """Ensure brand/model/category/year are REQUIRED criteria derived from detail metadata."""
+    if need.asset_type != AssetType.VEHICLE:
+        return
+    vehicle = getattr(need, 'vehicle', None)
+    if vehicle is None:
+        return
+
+    structural_specs = [
+        ('vehicle_category', 30),
+        ('brand', 30),
+        ('model', 30),
+        ('line', 20),
+        ('year_min', 20),
+        ('year_max', 20),
+    ]
+    for attribute, weight in structural_specs:
+        value = getattr(vehicle, attribute, None)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            NeedCriterion.objects.filter(need=need, attribute=attribute).delete()
+            continue
+        NeedCriterion.objects.update_or_create(
+            need=need,
+            attribute=attribute,
+            defaults={'mode': 'REQUIRED', 'weight': weight},
+        )
+
+
 @transaction.atomic
-def create_need(buyer, data: dict) -> Need:
-    if not buyer.can_publish:
-        raise UserNotVerifiedError('Debés verificar email y teléfono para publicar')
+def create_need(buyer, data: dict, *, bypass_verification: bool = False) -> Need:
+    if not bypass_verification and not buyer.can_publish:
+        raise UserNotVerifiedError('Debes verificar email y teléfono para publicar')
     payment_types = data.get('payment_types') or [data['payment_type']]
     if not payment_types:
         payment_types = [data['payment_type']]
+    geo = resolve_geo_location(
+        department=data.get('department'),
+        city=data.get('city'),
+        geo_city_id=data.get('geo_city_id'),
+        location=data.get('location'),
+    )
+
+    trade_in_item_id = data.get('trade_in_inventory_id')
+    if trade_in_item_id:
+        from apps.inventory.models import InventoryItem
+
+        try:
+            trade_item = InventoryItem.objects.get(id=trade_in_item_id, seller=buyer)
+        except InventoryItem.DoesNotExist as exc:
+            raise ValidationError(
+                'El inventario de permuta no existe o no te pertenece'
+            ) from exc
+    else:
+        trade_item = None
+
     need = Need.objects.create(
         buyer=buyer,
         asset_type=data['asset_type'],
@@ -39,11 +88,25 @@ def create_need(buyer, data: dict) -> Need:
         payment_type=payment_types[0],
         payment_types=payment_types,
         trade_in_description=data.get('trade_in_description', ''),
-        city=data['city'],
-        location=data['location'],
+        trade_in_item=trade_item,
+        city=geo['city'],
+        department=geo['department'],
+        geo_city=geo['geo_city'],
+        willing_to_travel=bool(data.get('willing_to_travel')),
+        location=geo['location'],
         status=NeedStatus.DRAFT,
     )
+    travel_cities = resolve_travel_city_ids(data.get('travel_city_ids') or [])
+    if travel_cities:
+        need.willing_to_travel = True
+        need.save(update_fields=['willing_to_travel', 'updated_at'])
+        need.travel_cities.set(travel_cities)
     detail_data = data.get('detail') or {}
+    catalog_version_id = detail_data.get('catalog_version_id')
+    if need.asset_type == AssetType.VEHICLE and catalog_version_id:
+        from apps.catalog.services.version_specs import validate_detail_against_version
+
+        validate_detail_against_version(catalog_version_id, detail_data)
     if need.asset_type == AssetType.VEHICLE:
         VehicleNeed.objects.create(need=need, **_filter_model_fields(VehicleNeed, detail_data))
     else:
@@ -53,6 +116,10 @@ def create_need(buyer, data: dict) -> Need:
         NeedCriterion.objects.create(need=need, **criterion)
     for image in data.get('images') or []:
         NeedImage.objects.create(need=need, **image)
+    if not need.images.exists():
+        from apps.needs.services.thumbnails import ensure_need_thumbnail
+
+        ensure_need_thumbnail(need)
 
     log_audit_event(
         actor_user=buyer,
@@ -66,15 +133,16 @@ def create_need(buyer, data: dict) -> Need:
 @transaction.atomic
 def publish_need(need: Need, buyer, *, legal_accepted: bool = True) -> Need:
     if need.buyer_id != buyer.id:
-        raise PermissionError('No podés publicar esta necesidad')
+        raise PermissionError('No puedes publicar esta necesidad')
     if need.status != NeedStatus.DRAFT:
         raise ValidationError('Solo se puede publicar desde DRAFT')
     if not legal_accepted:
-        raise ValidationError('Debés aceptar la cláusula de responsabilidad')
+        raise ValidationError('Debes aceptar la cláusula de responsabilidad')
     if not buyer.can_publish:
         raise UserNotVerifiedError()
 
     _validate_budget_ratio(need.budget_max_cop)
+    _sync_structural_criteria(need)
     days = get_setting('NEED_DURATION_DAYS', 30)
     need.status = NeedStatus.ACTIVE
     need.expires_at = timezone.now() + timedelta(days=days)
@@ -180,7 +248,7 @@ def delete_need(need: Need, buyer) -> Need:
 @transaction.atomic
 def renew_need(need: Need, buyer) -> Need:
     if need.buyer_id != buyer.id:
-        raise PermissionError('No podés renovar esta necesidad')
+        raise PermissionError('No puedes renovar esta necesidad')
     if need.status not in (NeedStatus.ACTIVE, NeedStatus.PAUSED):
         raise ValidationError('Solo se pueden renovar necesidades activas o pausadas')
     if not need.expires_at:

@@ -45,6 +45,7 @@ def complete_topup_order(
 
     wallet = get_or_create_wallet(order.user)
     package = order.package
+    # Idempotencia: no acreditar TOPUP dos veces por la misma orden
     apply_transaction(
         wallet=wallet,
         transaction_type=TransactionType.TOPUP,
@@ -52,6 +53,7 @@ def complete_topup_order(
         related_object=order,
         note=f'Recarga paquete {package.name}',
         created_by=order.user,
+        idempotency_key=f'topup:{order.id}',
     )
     if package.wantis_bonus:
         apply_transaction(
@@ -61,6 +63,7 @@ def complete_topup_order(
             related_object=order,
             note=f'Bonificación +{package.wantis_bonus}',
             created_by=order.user,
+            idempotency_key=f'topup-bonus:{order.id}',
         )
     order.status = TopupStatus.COMPLETED
     order.provider_reference = provider_reference
@@ -85,10 +88,12 @@ def complete_topup_order(
 
 
 @transaction.atomic
-def fail_topup_order(order: TopupOrder, provider_payload: dict | None = None) -> TopupOrder:
+def fail_topup_order(order: TopupOrder, provider_payload=None) -> TopupOrder:
     order = TopupOrder.objects.select_for_update().get(pk=order.pk)
     if order.status == TopupStatus.COMPLETED:
         raise ValidationError('No se puede fallar una orden completada')
+    if order.status in (TopupStatus.FAILED, TopupStatus.CANCELLED, TopupStatus.REFUNDED):
+        return order
     order.status = TopupStatus.FAILED
     if provider_payload is not None:
         order.provider_payload = provider_payload
@@ -100,3 +105,87 @@ def fail_topup_order(order: TopupOrder, provider_payload: dict | None = None) ->
         entity_id=order.id,
     )
     return order
+
+
+@transaction.atomic
+def cancel_topup_order(order: TopupOrder, provider_payload=None) -> TopupOrder:
+    order = TopupOrder.objects.select_for_update().get(pk=order.pk)
+    if order.status == TopupStatus.COMPLETED:
+        raise ValidationError('No se puede cancelar una orden completada')
+    if order.status in (TopupStatus.CANCELLED, TopupStatus.FAILED, TopupStatus.REFUNDED):
+        return order
+    order.status = TopupStatus.CANCELLED
+    if provider_payload is not None:
+        order.provider_payload = provider_payload
+    order.save(update_fields=['status', 'provider_payload', 'updated_at'])
+    log_audit_event(
+        actor_user=order.user,
+        action='TOPUP_ORDER_CANCELLED',
+        entity='TopupOrder',
+        entity_id=order.id,
+    )
+    return order
+
+
+def list_packages(include_inactive: bool = True):
+    qs = TopupPackage.objects.all().order_by('order', 'name')
+    if not include_inactive:
+        qs = qs.filter(is_active=True)
+    return qs
+
+
+@transaction.atomic
+def create_package(actor_user, data: dict) -> TopupPackage:
+    package = TopupPackage.objects.create(
+        name=data['name'],
+        wantis_base=data['wantis_base'],
+        wantis_bonus=data.get('wantis_bonus', 0),
+        price_cop=data['price_cop'],
+        is_popular=data.get('is_popular', False),
+        is_active=data.get('is_active', True),
+        order=data.get('order', 0),
+    )
+    log_audit_event(
+        actor_user=actor_user,
+        action='TOPUP_PACKAGE_CREATED',
+        entity='TopupPackage',
+        entity_id=package.id,
+        metadata={'name': package.name},
+    )
+    return package
+
+
+@transaction.atomic
+def update_package(package: TopupPackage, actor_user, data: dict) -> TopupPackage:
+    for field in (
+        'name',
+        'wantis_base',
+        'wantis_bonus',
+        'price_cop',
+        'is_popular',
+        'is_active',
+        'order',
+    ):
+        if field in data:
+            setattr(package, field, data[field])
+    package.save()
+    log_audit_event(
+        actor_user=actor_user,
+        action='TOPUP_PACKAGE_UPDATED',
+        entity='TopupPackage',
+        entity_id=package.id,
+    )
+    return package
+
+
+@transaction.atomic
+def deactivate_package(package: TopupPackage, actor_user) -> TopupPackage:
+    package.is_active = False
+    package.save(update_fields=['is_active', 'updated_at'])
+    log_audit_event(
+        actor_user=actor_user,
+        action='TOPUP_PACKAGE_DEACTIVATED',
+        entity='TopupPackage',
+        entity_id=package.id,
+    )
+    return package

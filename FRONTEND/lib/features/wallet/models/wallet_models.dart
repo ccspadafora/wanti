@@ -58,6 +58,8 @@ class WalletTransaction {
     required this.amountWantis,
     required this.balanceAfter,
     this.note,
+    this.contactName,
+    this.inventoryTitle,
     this.createdAt,
   });
 
@@ -66,6 +68,8 @@ class WalletTransaction {
   final int amountWantis;
   final int balanceAfter;
   final String? note;
+  final String? contactName;
+  final String? inventoryTitle;
   final DateTime? createdAt;
 
   String get label {
@@ -73,7 +77,7 @@ class WalletTransaction {
       case 'TOPUP':
         return 'Recarga';
       case 'UNLOCK':
-        return 'Desbloqueo';
+        return 'Desbloqueo de contacto';
       case 'REFUND':
         return 'Reembolso · Disputa';
       case 'BONUS':
@@ -83,6 +87,17 @@ class WalletTransaction {
     }
   }
 
+  String get detailLine {
+    if (type == 'UNLOCK') {
+      final parts = <String>[
+        if (contactName != null && contactName!.isNotEmpty) contactName!,
+        if (inventoryTitle != null && inventoryTitle!.isNotEmpty) inventoryTitle!,
+      ];
+      if (parts.isNotEmpty) return parts.join(' · ');
+    }
+    return note ?? '';
+  }
+
   factory WalletTransaction.fromJson(Map<String, dynamic> json) {
     return WalletTransaction(
       id: json['id']?.toString() ?? '',
@@ -90,6 +105,8 @@ class WalletTransaction {
       amountWantis: int.tryParse(json['amount_wantis']?.toString() ?? '0') ?? 0,
       balanceAfter: int.tryParse(json['balance_after']?.toString() ?? '0') ?? 0,
       note: json['note']?.toString(),
+      contactName: json['contact_name']?.toString(),
+      inventoryTitle: json['inventory_title']?.toString(),
       createdAt: DateTime.tryParse(json['created_at']?.toString() ?? ''),
     );
   }

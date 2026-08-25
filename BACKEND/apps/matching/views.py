@@ -86,8 +86,8 @@ class MatchDiscardView(APIView):
 
     def post(self, request, id):
         match = get_match_detail(id, request.user)
-        if match.buyer_id != request.user.id:
-            raise PermissionError('Solo el comprador puede descartar el match')
+        if request.user.id not in (match.buyer_id, match.seller_id):
+            raise PermissionError('Solo las partes del match pueden descartarlo')
         match.status = MatchStatus.DISCARDED
         match.discarded_at = timezone.now()
         match.save(update_fields=['status', 'discarded_at', 'updated_at'])
@@ -99,13 +99,27 @@ class MatchUnlockView(APIView):
 
     def post(self, request, match_id):
         match = get_match_detail(match_id, request.user)
-        unlock = unlock_contact(match, request.user)
+        idem = (
+            request.headers.get('Idempotency-Key')
+            or request.data.get('idempotency_key')
+            or ''
+        )
+        unlock, created = unlock_contact(
+            match,
+            request.user,
+            idempotency_key=str(idem).strip() or None,
+        )
+        lead = getattr(unlock, 'lead', None)
         payload = {
             'unlock_id': unlock.id,
-            'wantis_charged': unlock.wantis_charged,
-            'seller_phone': unlock.seller.phone if unlock else None,
+            'wantis_charged': unlock.wantis_charged if created else 0,
+            'already_unlocked': not created,
+            'seller_phone': unlock.seller.phone if request.user.id == unlock.buyer_id else None,
+            'buyer_phone': unlock.buyer.phone if request.user.id == unlock.seller_id else None,
+            'buyer_email': unlock.buyer.email if request.user.id == unlock.seller_id else None,
+            'lead_id': lead.id if lead else None,
         }
         return Response(
             UnlockContactResponseSerializer(payload).data,
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )

@@ -18,6 +18,21 @@ ERROR_MAP = {
 }
 
 
+def _flatten_error_messages(data):
+    messages = []
+    if isinstance(data, list):
+        for item in data:
+            messages.extend(_flatten_error_messages(item))
+    elif isinstance(data, dict):
+        for value in data.values():
+            messages.extend(_flatten_error_messages(value))
+    elif data is not None:
+        text = str(data).strip()
+        if text:
+            messages.append(text)
+    return messages
+
+
 def custom_exception_handler(exc, context):
     for exc_type, (code, http_status) in ERROR_MAP.items():
         if isinstance(exc, exc_type):
@@ -36,9 +51,11 @@ def custom_exception_handler(exc, context):
     if response is not None:
         if isinstance(response.data, dict) and 'detail' in response.data:
             message = str(response.data['detail'])
+            details = {}
         else:
-            message = 'Error de validación'
             details = response.data
+            flat = _flatten_error_messages(details)
+            message = '\n'.join(flat) if flat else 'Error de validación'
             return Response(
                 {
                     'error': {

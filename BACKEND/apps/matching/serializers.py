@@ -54,6 +54,9 @@ class MatchListSerializer(serializers.ModelSerializer):
     unlock_cost_wantis = serializers.SerializerMethodField()
     unlock_id = serializers.SerializerMethodField()
     seller_phone = serializers.SerializerMethodField()
+    buyer_phone = serializers.SerializerMethodField()
+    buyer_email = serializers.SerializerMethodField()
+    lead_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Match
@@ -74,6 +77,9 @@ class MatchListSerializer(serializers.ModelSerializer):
             'unlock_cost_wantis',
             'unlock_id',
             'seller_phone',
+            'buyer_phone',
+            'buyer_email',
+            'lead_id',
             'created_at',
         )
 
@@ -106,7 +112,7 @@ class MatchListSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or obj.status != MatchStatus.UNLOCKED:
             return None
-        if request.user.id != obj.buyer_id:
+        if request.user.id not in (obj.buyer_id, obj.seller_id):
             return None
         unlock = getattr(obj, 'unlock', None)
         return unlock.id if unlock else None
@@ -118,6 +124,34 @@ class MatchListSerializer(serializers.ModelSerializer):
         if request.user.id != obj.buyer_id:
             return None
         return obj.seller.phone
+
+    def get_buyer_phone(self, obj):
+        request = self.context.get('request')
+        if not request or obj.status != MatchStatus.UNLOCKED:
+            return None
+        if request.user.id != obj.seller_id:
+            return None
+        return obj.buyer.phone
+
+    def get_buyer_email(self, obj):
+        request = self.context.get('request')
+        if not request or obj.status != MatchStatus.UNLOCKED:
+            return None
+        if request.user.id != obj.seller_id:
+            return None
+        return obj.buyer.email
+
+    def get_lead_id(self, obj):
+        request = self.context.get('request')
+        if not request or obj.status != MatchStatus.UNLOCKED:
+            return None
+        if request.user.id != obj.seller_id:
+            return None
+        unlock = getattr(obj, 'unlock', None)
+        if not unlock:
+            return None
+        lead = getattr(unlock, 'lead', None)
+        return lead.id if lead else None
 
 
 class MatchDetailSerializer(MatchListSerializer):
@@ -135,4 +169,8 @@ class MatchDetailSerializer(MatchListSerializer):
 class UnlockContactResponseSerializer(serializers.Serializer):
     unlock_id = serializers.UUIDField()
     wantis_charged = serializers.IntegerField()
+    already_unlocked = serializers.BooleanField(required=False, default=False)
     seller_phone = serializers.CharField(allow_null=True)
+    buyer_phone = serializers.CharField(allow_null=True)
+    buyer_email = serializers.EmailField(allow_null=True)
+    lead_id = serializers.UUIDField(allow_null=True)

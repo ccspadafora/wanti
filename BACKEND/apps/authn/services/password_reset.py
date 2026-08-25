@@ -10,10 +10,10 @@ from apps.common.exceptions import ValidationError
 from apps.users.selectors.users import get_user_by_email
 
 
-def request_password_reset(email: str, ip_address=None) -> None:
+def request_password_reset(email: str, ip_address=None):
     user = get_user_by_email(email)
     if user is None:
-        return
+        return None
     PasswordResetToken.objects.filter(user=user, used_at__isnull=True).update(
         expires_at=timezone.now()
     )
@@ -38,6 +38,7 @@ def request_password_reset(email: str, ip_address=None) -> None:
         entity_id=user.id,
         ip_address=ip_address,
     )
+    return token.token
 
 
 @transaction.atomic

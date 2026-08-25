@@ -35,6 +35,9 @@ class DisputeEventSerializer(serializers.ModelSerializer):
 
 class DisputeListSerializer(serializers.ModelSerializer):
     opened_by = DisputePartySerializer(read_only=True)
+    reason_label = serializers.SerializerMethodField()
+    buyer_id = serializers.UUIDField(source='contact_unlock.buyer_id', read_only=True)
+    seller_id = serializers.UUIDField(source='contact_unlock.seller_id', read_only=True)
 
     class Meta:
         model = Dispute
@@ -42,17 +45,26 @@ class DisputeListSerializer(serializers.ModelSerializer):
             'id',
             'status',
             'reason',
+            'reason_label',
             'opened_by',
             'contact_unlock_id',
+            'buyer_id',
+            'seller_id',
             'auto_review_deadline',
             'created_at',
         )
+
+    def get_reason_label(self, obj):
+        return DisputeReason(obj.reason).label if obj.reason in DisputeReason.values else obj.reason
 
 
 class DisputeDetailSerializer(serializers.ModelSerializer):
     opened_by = DisputePartySerializer(read_only=True)
     attachments = DisputeAttachmentSerializer(many=True, read_only=True)
     events = DisputeEventSerializer(many=True, read_only=True)
+    reason_label = serializers.SerializerMethodField()
+    buyer_id = serializers.UUIDField(source='contact_unlock.buyer_id', read_only=True)
+    seller_id = serializers.UUIDField(source='contact_unlock.seller_id', read_only=True)
 
     class Meta:
         model = Dispute
@@ -60,9 +72,12 @@ class DisputeDetailSerializer(serializers.ModelSerializer):
             'id',
             'status',
             'reason',
+            'reason_label',
             'description',
             'opened_by',
             'contact_unlock_id',
+            'buyer_id',
+            'seller_id',
             'attachments',
             'events',
             'auto_review_deadline',
@@ -75,6 +90,9 @@ class DisputeDetailSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         )
+
+    def get_reason_label(self, obj):
+        return DisputeReason(obj.reason).label if obj.reason in DisputeReason.values else obj.reason
 
 
 class DisputeRespondAutoSerializer(serializers.Serializer):

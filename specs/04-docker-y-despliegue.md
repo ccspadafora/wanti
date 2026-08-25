@@ -20,6 +20,9 @@
 11. Comandos operativos
 12. Checklist de release
 13. Checklist maestro del proyecto
+14. Historias de usuario del contrato — matriz de cumplimiento
+15. Roadmap sugerido
+16. Panel admin React en el servidor (EC2 bootstrap)
 
 ---
 
@@ -690,6 +693,24 @@ server {
         expires 7d;
     }
 
+    # Panel admin React (SPA) — ver también docker/nginx.bootstrap.conf
+    # Build: `cd ADMIN && VITE_BASE=/panel/ npm run build` → montar en /var/www/panel
+    location = /panel { return 301 /panel/; }
+    location /panel/ {
+        root /var/www;
+        try_files $uri $uri/ /panel/index.html;
+    }
+
+    # Django Admin
+    location /admin/ {
+        proxy_pass http://django_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     # API
     location /api/ {
         proxy_pass http://django_backend;
@@ -1306,6 +1327,32 @@ Orden recomendado de sprints:
 - Twilio real para OTP en producción
 - Provider real de generación de imágenes IA (OpenAI DALL-E / Stability / Replicate)
 - Push notifications reales (FCM + APNs)
+
+---
+
+## 16 · Panel admin React en el servidor (EC2 bootstrap)
+
+En el stack `docker-compose.server.yml` (instancia única EC2), nginx sirve:
+
+| Ruta | Contenido |
+|---|---|
+| `/api/` | Proxy a Django |
+| `/admin/` | Django Admin |
+| `/panel/` | SPA React (`ADMIN/`) |
+| `/static/`, `/media/` | Archivos estáticos / media |
+
+**URL demo actual:** `http://67.202.17.248/panel/`  
+**Credenciales:** `admin@wanti.co` / `WantiAdmin2026!`
+
+Build y deploy:
+
+```bash
+cd ADMIN && VITE_BASE=/panel/ npm run build
+# copiar dist → BACKEND/admin-panel/ → rsync a /opt/wanti/admin-panel/
+# nginx monta ./admin-panel → /var/www/panel
+```
+
+Detalle operativo: `ADMIN/README.md` y `docker/nginx.bootstrap.conf`.
 
 ---
 

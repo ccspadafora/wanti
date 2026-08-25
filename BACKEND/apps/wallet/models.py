@@ -12,7 +12,7 @@ class Wallet(BaseModel):
         related_name='wallet',
         verbose_name='Usuario',
     )
-    balance_wantis = models.IntegerField(default=0, verbose_name='Saldo en Wantis')
+    balance_wantis = models.IntegerField(default=0, verbose_name='Saldo en Wanti')
 
     class Meta:
         db_table = 'wallets'
@@ -35,7 +35,7 @@ class WalletTransaction(BaseModel):
         choices=TransactionType.choices,
         verbose_name='Tipo de transacción',
     )
-    amount_wantis = models.IntegerField(verbose_name='Monto en Wantis')
+    amount_wantis = models.IntegerField(verbose_name='Monto en Wanti')
     balance_after = models.IntegerField(verbose_name='Saldo posterior')
     related_object_type = models.CharField(
         max_length=50,
@@ -46,6 +46,13 @@ class WalletTransaction(BaseModel):
         null=True,
         blank=True,
         verbose_name='ID de objeto relacionado',
+    )
+    idempotency_key = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        verbose_name='Clave de idempotencia',
     )
     note = models.TextField(blank=True, verbose_name='Nota')
     created_by = models.ForeignKey(
@@ -65,6 +72,16 @@ class WalletTransaction(BaseModel):
             models.Index(fields=['wallet', '-created_at']),
             models.Index(fields=['transaction_type']),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['transaction_type', 'related_object_type', 'related_object_id'],
+                condition=models.Q(
+                    transaction_type='UNLOCK',
+                    related_object_id__isnull=False,
+                ),
+                name='uniq_unlock_charge_per_related_object',
+            ),
+        ]
 
     def __str__(self):
         return f'{self.transaction_type} {self.amount_wantis} → {self.balance_after}'
@@ -72,8 +89,8 @@ class WalletTransaction(BaseModel):
 
 class TopupPackage(BaseModel):
     name = models.CharField(max_length=80, verbose_name='Nombre')
-    wantis_base = models.IntegerField(verbose_name='Wantis base')
-    wantis_bonus = models.IntegerField(default=0, verbose_name='Wantis de bonificación')
+    wantis_base = models.IntegerField(verbose_name='Wanti base')
+    wantis_bonus = models.IntegerField(default=0, verbose_name='Wanti de bonificación')
     price_cop = models.DecimalField(
         max_digits=15,
         decimal_places=2,
@@ -110,7 +127,7 @@ class TopupOrder(BaseModel):
         related_name='orders',
         verbose_name='Paquete',
     )
-    wantis_total = models.IntegerField(verbose_name='Total de Wantis')
+    wantis_total = models.IntegerField(verbose_name='Total de Wanti')
     price_cop = models.DecimalField(
         max_digits=15,
         decimal_places=2,

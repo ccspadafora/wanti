@@ -1,3 +1,4 @@
+from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import serializers
 
 from apps.reviews.models import Review, ReviewDispute, ReviewTag
@@ -32,6 +33,7 @@ class ReviewDisputeCreateSerializer(serializers.Serializer):
 class ReviewSerializer(serializers.ModelSerializer):
     reviewer = ReviewerBriefSerializer(read_only=True)
     reviewee = ReviewerBriefSerializer(read_only=True)
+    dispute = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -44,10 +46,25 @@ class ReviewSerializer(serializers.ModelSerializer):
             'comment',
             'tags',
             'status',
+            'dispute',
             'created_at',
             'updated_at',
         )
         read_only_fields = fields
+
+    def get_dispute(self, obj):
+        try:
+            d = obj.dispute
+        except ObjectDoesNotExist:
+            return None
+        return {
+            'id': str(d.id),
+            'status': d.status,
+            'reason': d.reason,
+            'created_at': d.created_at,
+            'resolved_at': d.resolved_at,
+            'admin_note': d.admin_note or '',
+        }
 
 
 class ReviewPublicSerializer(serializers.ModelSerializer):

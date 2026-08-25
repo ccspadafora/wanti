@@ -46,3 +46,6 @@ htmlcov/
 backups/
 *.dump
 *.dump.gz
+
+# Built React admin served by nginx
+admin-panel/

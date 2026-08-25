@@ -141,4 +141,24 @@ class AuthRepository {
       },
     );
   }
+
+  Future<String?> requestPasswordReset(String email) async {
+    final data = await _api.post(
+      '/auth/password/reset-request/',
+      auth: false,
+      body: {'email': email.trim()},
+    );
+    return data['debug_token']?.toString();
+  }
+
+  Future<void> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) async {
+    await _api.post(
+      '/auth/password/reset-confirm/',
+      auth: false,
+      body: {'token': token, 'new_password': newPassword},
+    );
+  }
 }

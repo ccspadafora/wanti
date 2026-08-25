@@ -24,7 +24,7 @@ class ContactUnlock(BaseModel):
         related_name='unlocks_as_seller',
         verbose_name='Vendedor',
     )
-    wantis_charged = models.IntegerField(default=1, verbose_name='Wantis cobrados')
+    wantis_charged = models.IntegerField(default=1, verbose_name='Wanti cobrados')
     wallet_transaction = models.OneToOneField(
         'wallet.WalletTransaction',
         on_delete=models.PROTECT,

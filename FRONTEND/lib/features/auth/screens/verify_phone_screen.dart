@@ -173,7 +173,7 @@ class _VerifyPhoneScreenState extends State<VerifyPhoneScreen> {
                           ),
                           const SizedBox(height: 20),
                           Text(
-                            'Ingresá el código',
+                            'Ingresa el código',
                             style: GoogleFonts.nunito(
                               fontSize: 26,
                               fontWeight: FontWeight.w800,

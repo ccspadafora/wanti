@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/wanti_colors.dart';
@@ -69,11 +70,33 @@ class _WalletScreenState extends State<WalletScreen> {
     if (id == null) return;
     setState(() => _topping = true);
     try {
-      await context.read<WalletRepository>().topup(id);
+      final result = await context.read<WalletRepository>().topup(id);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Recarga iniciada / aplicada')),
-      );
+      final status = (result['status'] ?? '').toString().toUpperCase();
+      final checkout = result['checkout_url']?.toString();
+      if (status == 'COMPLETED') {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Wanti acreditados')),
+        );
+      } else if (checkout != null && checkout.isNotEmpty) {
+        final uri = Uri.tryParse(checkout);
+        if (uri != null) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Completa el pago. El saldo se actualizará al confirmarse.'),
+          ),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Orden creada ($status). Esperando confirmación de pago.')),
+        );
+      }
+      if (!mounted) return;
       await _load();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -157,7 +180,7 @@ class _WalletScreenState extends State<WalletScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '${balance?.balanceWantis ?? 0} Wantis',
+                        '${balance?.balanceWantis ?? 0} Wanti',
                         style: GoogleFonts.nunito(
                           fontSize: 32,
                           fontWeight: FontWeight.w800,
@@ -177,7 +200,7 @@ class _WalletScreenState extends State<WalletScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
                 child: Text(
-                  'Recargar Wantis',
+                  'Recargar Wanti',
                   style: GoogleFonts.nunito(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -214,7 +237,7 @@ class _WalletScreenState extends State<WalletScreen> {
                                   Row(
                                     children: [
                                       Text(
-                                        '${pkg.wantisTotal} Wantis',
+                                        '${pkg.wantisTotal} Wanti',
                                         style: GoogleFonts.nunito(
                                           fontWeight: FontWeight.w800,
                                           fontSize: 16,
@@ -352,14 +375,20 @@ class _WalletScreenState extends State<WalletScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        txn.note?.isNotEmpty == true
-                                            ? '${txn.label} · ${txn.note}'
-                                            : txn.label,
+                                        txn.label,
                                         style: GoogleFonts.nunito(
                                           fontWeight: FontWeight.w700,
                                           color: WantiColors.ink,
                                         ),
                                       ),
+                                      if (txn.detailLine.isNotEmpty)
+                                        Text(
+                                          txn.detailLine,
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 12,
+                                            color: WantiColors.inkMuted,
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ),

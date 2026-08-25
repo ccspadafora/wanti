@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../notifications/data/push_service.dart';
 import '../data/auth_repository.dart';
 import '../models/user_model.dart';
 
@@ -9,13 +10,16 @@ class AuthController extends ChangeNotifier {
   AuthController({
     required ApiClient api,
     required AuthRepository repository,
+    PushService? push,
   })  : _api = api,
-        _repo = repository {
+        _repo = repository,
+        _push = push {
     _api.onRefreshNeeded = () => _api.refreshAccessToken();
   }
 
   final ApiClient _api;
   final AuthRepository _repo;
+  final PushService? _push;
 
   UserModel? user;
   bool loading = true;
@@ -31,6 +35,12 @@ class AuthController extends ChangeNotifier {
       user!.emailVerifiedAt != null &&
       user!.phoneVerifiedAt == null;
 
+  Future<void> _syncPush() async {
+    final u = user;
+    if (u == null || _push == null) return;
+    await _push.bindUser(u.id);
+  }
+
   Future<void> bootstrap() async {
     loading = true;
     notifyListeners();
@@ -38,6 +48,7 @@ class AuthController extends ChangeNotifier {
     if (_api.hasSession) {
       try {
         user = await _repo.me();
+        await _syncPush();
       } catch (_) {
         await _api.clearTokens();
         user = null;
@@ -70,6 +81,7 @@ class AuthController extends ChangeNotifier {
     final login = await _repo.login(email: email, password: password);
     await _api.saveTokens(access: login.access, refresh: login.refresh);
     user = login.user;
+    await _syncPush();
     notifyListeners();
   }
 
@@ -81,6 +93,7 @@ class AuthController extends ChangeNotifier {
       user = await _repo.me();
     } catch (_) {}
     lastPassword = password;
+    await _syncPush();
     notifyListeners();
   }
 
@@ -88,7 +101,7 @@ class AuthController extends ChangeNotifier {
     final t = token ?? pendingEmailToken;
     if (t == null || t.isEmpty) {
       throw ApiException(
-        message: 'No hay token de verificación. Tocá "Reenviar enlace".',
+        message: 'No hay token de verificación. Toca "Reenviar enlace".',
       );
     }
     await _repo.verifyEmail(t);
@@ -156,7 +169,19 @@ class AuthController extends ChangeNotifier {
     lastPassword = newPassword;
   }
 
+  Future<String?> requestPasswordReset(String email) {
+    return _repo.requestPasswordReset(email);
+  }
+
+  Future<void> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) {
+    return _repo.confirmPasswordReset(token: token, newPassword: newPassword);
+  }
+
   Future<void> logout() async {
+    await _push?.unbindUser();
     await _repo.logout(_api.refreshToken);
     user = null;
     pendingEmailToken = null;

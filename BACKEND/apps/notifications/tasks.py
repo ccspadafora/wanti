@@ -16,26 +16,42 @@ def notify_matches(need_id):
     dispatch(
         need.buyer,
         'MATCH_NEW_FOR_BUYER',
-        body=f'Tenés {matches.count()} nuevos matches para {need.title}',
+        title='Nuevos matches',
+        body=f'Tienes {matches.count()} nuevos matches para {need.title}',
+        payload={'need_id': str(need.id)},
     )
     for match in matches:
         dispatch(
             match.seller,
             'MATCH_NEW_FOR_SELLER',
+            title='Alguien busca lo que tienes',
             body=f'Un comprador busca algo como tu {match.inventory_item.title}',
-            payload={'match_id': str(match.id)},
+            payload={
+                'match_id': str(match.id),
+                'need_id': str(need.id),
+                'inventory_item_id': str(match.inventory_item_id),
+            },
         )
 
 
 @shared_task(name='apps.notifications.tasks.notify_contact_unlocked')
 def notify_contact_unlocked(unlock_id):
-    unlock = ContactUnlock.objects.get(id=unlock_id)
+    unlock = ContactUnlock.objects.select_related(
+        'buyer', 'seller', 'match__inventory_item'
+    ).get(id=unlock_id)
+    item_title = unlock.match.inventory_item.title
+    buyer_name = unlock.buyer.full_name.split(' ')[0]
     dispatch(
         unlock.seller,
         'CONTACT_UNLOCKED_TO_SELLER',
         channel=NotificationChannel.PUSH,
-        body='Un comprador desbloqueó tu contacto',
-        payload={'unlock_id': str(unlock.id)},
+        title='Compraron tu contacto',
+        body=f'{buyer_name} desbloqueó tu contacto por “{item_title}”',
+        payload={
+            'unlock_id': str(unlock.id),
+            'buyer_id': str(unlock.buyer_id),
+            'inventory_item_id': str(unlock.match.inventory_item_id),
+        },
     )
 
 

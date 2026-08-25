@@ -25,6 +25,20 @@ class InventoryItem(BaseModel):
         verbose_name='Precio (COP)',
     )
     city = models.CharField(max_length=100, verbose_name='Ciudad')
+    department = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        verbose_name='Departamento',
+    )
+    geo_city = models.ForeignKey(
+        'geo.GeoCity',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='inventory_items',
+        verbose_name='Ciudad (catálogo)',
+    )
     location = models.PointField(
         srid=4326,
         geography=True,

@@ -1,4 +1,6 @@
-from django.db.models import F, Q
+from decimal import Decimal, InvalidOperation
+
+from django.db.models import F
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -11,8 +13,8 @@ from apps.matching.serializers import MatchListSerializer
 from apps.needs.models import Need
 from apps.needs.selectors.needs import (
     get_need_by_id,
-    list_needs_for_seller_search,
     list_own_needs,
+    search_active_needs,
 )
 from apps.needs.serializers import (
     NeedCreateSerializer,
@@ -23,6 +25,49 @@ from apps.needs.serializers import (
     NeedUpdateSerializer,
 )
 from apps.needs.services import needs as needs_service
+
+
+def _parse_int_param(value):
+    if value in (None, ''):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_decimal_param(value):
+    if value in (None, ''):
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
+
+
+def _search_params(request):
+    return {
+        'asset_type': request.query_params.get('asset_type'),
+        'city': request.query_params.get('city'),
+        'brand': request.query_params.get('brand'),
+        'model': request.query_params.get('model'),
+        'line': request.query_params.get('line'),
+        'year': _parse_int_param(request.query_params.get('year')),
+        'vehicle_category': request.query_params.get('vehicle_category'),
+        'fuel_type': request.query_params.get('fuel_type'),
+        'transmission': request.query_params.get('transmission'),
+        'property_type': request.query_params.get('property_type'),
+        'listing_intent': request.query_params.get('listing_intent'),
+        'bedrooms_min': _parse_int_param(request.query_params.get('bedrooms_min')),
+        'bathrooms_min': _parse_int_param(request.query_params.get('bathrooms_min')),
+        'area_min_sqm': _parse_int_param(request.query_params.get('area_min_sqm')),
+        'socioeconomic_stratum': _parse_int_param(
+            request.query_params.get('socioeconomic_stratum')
+        ),
+        'parking_spots_min': _parse_int_param(request.query_params.get('parking_spots_min')),
+        'max_budget': _parse_decimal_param(request.query_params.get('max_budget')),
+        'ordering': request.query_params.get('ordering', '-created_at'),
+    }
 
 
 class NeedListCreateView(APIView):
@@ -40,20 +85,12 @@ class NeedListCreateView(APIView):
     def get(self, request):
         scope = request.query_params.get('scope')
         if scope == 'browse':
-            qs = list_needs_for_seller_search(
-                request.user,
-                asset_type=request.query_params.get('asset_type'),
-                city=request.query_params.get('city'),
-            )
-            search = request.query_params.get('search')
-            if search:
-                qs = qs.filter(Q(title__icontains=search) | Q(description__icontains=search))
-            ordering = request.query_params.get('ordering', '-created_at')
-            if ordering.lstrip('-') in ('created_at', 'matches_count', 'budget_max_cop'):
-                qs = qs.order_by(ordering)
+            qs = search_active_needs(request.user, **_search_params(request))
             serializer = NeedListSerializer(qs, many=True)
         else:
-            qs = list_own_needs(request.user)
+            qs = list_own_needs(request.user).select_related('vehicle', 'property').prefetch_related(
+                'images'
+            )
             serializer = NeedListSerializer(qs, many=True)
         return Response(serializer.data)
 
@@ -62,6 +99,16 @@ class NeedListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         need = needs_service.create_need(request.user, serializer.to_service_data())
         return Response(NeedSerializer(need).data, status=status.HTTP_201_CREATED)
+
+
+class NeedSearchView(APIView):
+    """Structured manual search — independent from matching and viewer inventory."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        qs = search_active_needs(request.user, **_search_params(request))
+        return Response(NeedListSerializer(qs, many=True).data)
 
 
 class NeedDetailView(APIView):

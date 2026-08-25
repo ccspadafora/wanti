@@ -46,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.displayMessage)));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -61,23 +61,27 @@ class _LoginScreenState extends State<LoginScreen> {
           SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const WantiLogo(
-                    variant: WantiLogoVariant.wordmark,
-                    height: 48,
-                    surface: true,
-                    surfaceRadius: 16,
-                    surfacePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const Center(
+                    child: WantiLogo(
+                      variant: WantiLogoVariant.wordmark,
+                      height: 44,
+                      alignment: Alignment.center,
+                      surface: true,
+                      surfaceRadius: 16,
+                      surfacePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 12),
                   Text(
                     'Bienvenido de nuevo',
+                    textAlign: TextAlign.center,
                     style: GoogleFonts.nunito(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -135,11 +139,24 @@ class _LoginScreenState extends State<LoginScreen> {
                         loading: _loading,
                         onPressed: _submit,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => context.push('/forgot-password'),
+                          child: Text(
+                            '¿Olvidaste tu contraseña?',
+                            style: GoogleFonts.nunito(
+                              fontWeight: FontWeight.w700,
+                              color: WantiColors.tealDark,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Center(
                         child: TextButton(
                           onPressed: () => context.go('/register'),
-                          child: const Text('¿No tenés cuenta? Crear cuenta'),
+                          child: const Text('¿No tienes cuenta? Crear cuenta'),
                         ),
                       ),
                     ],

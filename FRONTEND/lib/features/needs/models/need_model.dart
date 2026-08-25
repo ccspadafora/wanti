@@ -11,6 +11,7 @@ class NeedModel {
     this.expiresAt,
     this.description,
     this.vehicle,
+    this.thumbnailUrl,
     this.canRenew = false,
   });
 
@@ -25,7 +26,10 @@ class NeedModel {
   final DateTime? expiresAt;
   final String? description;
   final Map<String, dynamic>? vehicle;
+  final String? thumbnailUrl;
   final bool canRenew;
+
+  Map<String, dynamic>? get detail => vehicle;
 
   int? get daysRemaining {
     if (expiresAt == null) return null;
@@ -38,6 +42,24 @@ class NeedModel {
     final days = daysRemaining;
     if (days == null) return false;
     return status == 'ACTIVE' || status == 'PAUSED' ? days <= 5 : false;
+  }
+
+  NeedModel copyWith({int? matchesCount}) {
+    return NeedModel(
+      id: id,
+      title: title,
+      assetType: assetType,
+      budgetMaxCop: budgetMaxCop,
+      paymentType: paymentType,
+      city: city,
+      status: status,
+      matchesCount: matchesCount ?? this.matchesCount,
+      expiresAt: expiresAt,
+      description: description,
+      vehicle: vehicle,
+      thumbnailUrl: thumbnailUrl,
+      canRenew: canRenew,
+    );
   }
 
   factory NeedModel.fromJson(Map<String, dynamic> json) {
@@ -62,6 +84,7 @@ class NeedModel {
           : json['detail'] is Map
               ? Map<String, dynamic>.from(json['detail'] as Map)
               : null,
+      thumbnailUrl: json['thumbnail_url']?.toString(),
       canRenew: json['can_renew'] == true,
     );
   }

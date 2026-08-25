@@ -66,12 +66,8 @@ class UserMeSerializer(serializers.ModelSerializer):
 
 
 class UserMeUpdateSerializer(serializers.Serializer):
-    full_name = serializers.CharField(max_length=150, required=False)
     city = serializers.CharField(max_length=100, required=False)
     location = serializers.JSONField(required=False, allow_null=True)
-    profile_photo_url = serializers.URLField(
-        max_length=500, required=False, allow_null=True, allow_blank=True
-    )
 
     def validate_location(self, value):
         return _parse_location(value)

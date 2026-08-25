@@ -35,11 +35,11 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
   Future<void> _request() async {
     final phone = _phone.text.trim();
     if (phone.length < 10) {
-      _toast('Ingresá un teléfono válido');
+      _toast('Ingresa un teléfono válido');
       return;
     }
     if (_password.text.isEmpty) {
-      _toast('Confirmá con tu contraseña');
+      _toast('Confirma con tu contraseña');
       return;
     }
     setState(() => _loading = true);
@@ -62,7 +62,7 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
 
   Future<void> _verify() async {
     if (_otp.text.trim().length < 4) {
-      _toast('Ingresá el código OTP');
+      _toast('Ingresa el código OTP');
       return;
     }
     setState(() => _loading = true);
@@ -124,7 +124,7 @@ class _ChangePhoneScreenState extends State<ChangePhoneScreen> {
                     WantiButton(label: 'Enviar OTP', loading: _loading, onPressed: _request),
                   ] else ...[
                     Text(
-                      'Ingresá el código que enviamos a ${_phone.text.trim()}',
+                      'Ingresa el código que enviamos a ${_phone.text.trim()}',
                       style: GoogleFonts.nunito(color: WantiColors.inkMuted, height: 1.4),
                     ),
                     if (_debugOtp != null) ...[

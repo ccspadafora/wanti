@@ -30,11 +30,11 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
 
   Future<void> _submit() async {
     if (!_email.text.contains('@')) {
-      _toast('Ingresá un email válido');
+      _toast('Ingresa un email válido');
       return;
     }
     if (_password.text.isEmpty) {
-      _toast('Confirmá con tu contraseña');
+      _toast('Confirma con tu contraseña');
       return;
     }
     setState(() => _loading = true);
@@ -47,7 +47,7 @@ class _ChangeEmailScreenState extends State<ChangeEmailScreen> {
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('Revisá tu correo', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+          title: Text('Revisa tu correo', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
           content: Text(msg, style: GoogleFonts.nunito()),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Entendido')),

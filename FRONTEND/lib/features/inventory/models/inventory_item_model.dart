@@ -7,7 +7,12 @@ class InventoryItemModel {
     required this.city,
     required this.status,
     this.unlockCount = 0,
+    this.matchesCount = 0,
     this.subtitle,
+    this.brand,
+    this.model,
+    this.vehicleCategory,
+    this.propertyType,
   });
 
   final String id;
@@ -17,7 +22,12 @@ class InventoryItemModel {
   final String city;
   final String status;
   final int unlockCount;
+  final int matchesCount;
   final String? subtitle;
+  final String? brand;
+  final String? model;
+  final String? vehicleCategory;
+  final String? propertyType;
 
   bool get isVehicle => assetType == 'VEHICLE';
 
@@ -58,7 +68,12 @@ class InventoryItemModel {
       city: json['city']?.toString() ?? '',
       status: json['status']?.toString() ?? 'AVAILABLE',
       unlockCount: int.tryParse(json['unlock_count']?.toString() ?? '0') ?? 0,
+      matchesCount: int.tryParse(json['matches_count']?.toString() ?? '0') ?? 0,
       subtitle: subtitle,
+      brand: vehicle?['brand']?.toString(),
+      model: vehicle?['model']?.toString(),
+      vehicleCategory: vehicle?['vehicle_category']?.toString(),
+      propertyType: property?['property_type']?.toString(),
     );
   }
 }

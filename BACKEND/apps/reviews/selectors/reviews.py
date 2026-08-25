@@ -15,13 +15,27 @@ def get_user_rating(user):
 
 
 def list_reviews_of_user(user):
+    """Reseñas públicas del perfil (solo publicadas)."""
     return Review.objects.filter(reviewee=user, status=ReviewStatus.PUBLISHED).order_by(
         '-created_at'
     )
 
 
+def list_my_received_reviews(user):
+    """Reseñas recibidas para el dueño: incluye impugnadas / eliminadas."""
+    return (
+        Review.objects.filter(reviewee=user)
+        .select_related('reviewer', 'reviewee', 'dispute')
+        .order_by('-created_at')
+    )
+
+
 def list_reviews_by_user(user):
-    return Review.objects.filter(reviewer=user).order_by('-created_at')
+    return (
+        Review.objects.filter(reviewer=user)
+        .select_related('reviewer', 'reviewee', 'dispute')
+        .order_by('-created_at')
+    )
 
 
 def list_review_disputes_pending(actor_user):

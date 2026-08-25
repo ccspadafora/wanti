@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/launch_navy" />
+    <item android:drawable="@color/launch_canvas" />
     <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@drawable/splash_logo" />
+        <inset
+            android:drawable="@drawable/splash_logo"
+            android:insetLeft="22%"
+            android:insetTop="30%"
+            android:insetRight="22%"
+            android:insetBottom="30%" />
     </item>
 </layer-list>

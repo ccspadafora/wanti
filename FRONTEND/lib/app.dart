@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'core/theme/wanti_theme.dart';
+import 'features/auth/screens/forgot_password_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/screens/register_screen.dart';
 import 'features/auth/screens/verified_screen.dart';
@@ -9,16 +10,27 @@ import 'features/auth/screens/verify_email_screen.dart';
 import 'features/auth/screens/verify_phone_screen.dart';
 import 'features/auth/screens/welcome_screen.dart';
 import 'features/auth/state/auth_controller.dart';
+import 'features/contacts/screens/buyer_contacts_screen.dart';
+import 'features/contacts/screens/contact_purchasers_screen.dart';
 import 'features/contacts/screens/contact_unlocked_screen.dart';
+import 'features/disputes/screens/disputes_screen.dart';
 import 'features/home/screens/home_shell.dart';
 import 'features/inventory/screens/add_inventory_screen.dart';
+import 'features/needs/screens/browse_needs_screen.dart';
+import 'features/needs/screens/edit_need_screen.dart';
 import 'features/needs/screens/new_need_flow_screen.dart';
+import 'features/notifications/screens/notifications_screen.dart';
 import 'features/profile/screens/change_email_screen.dart';
 import 'features/profile/screens/change_password_screen.dart';
 import 'features/profile/screens/change_phone_screen.dart';
 import 'features/profile/screens/edit_profile_screen.dart';
 import 'features/profile/screens/profile_screen.dart';
+import 'features/reviews/screens/my_reviews_screen.dart';
+import 'features/seller/screens/lead_detail_screen.dart';
+import 'features/seller/screens/seller_alerts_screen.dart';
 import 'features/seller/screens/seller_leads_screen.dart';
+import 'features/notifications/data/push_service.dart';
+import 'features/wallet/screens/wallet_screen.dart';
 
 GoRouter createRouter(AuthController auth) {
   return GoRouter(
@@ -27,7 +39,13 @@ GoRouter createRouter(AuthController auth) {
     redirect: (context, state) {
       if (auth.loading) return null;
       final loc = state.matchedLocation;
-      final public = {'/welcome', '/login', '/register'};
+      final public = {
+        '/welcome',
+        '/login',
+        '/register',
+        '/forgot-password',
+        '/reset-password',
+      };
 
       if (!auth.isAuthenticated) {
         return public.contains(loc) ? null : '/welcome';
@@ -52,6 +70,14 @@ GoRouter createRouter(AuthController auth) {
       GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, _) => const RegisterScreen()),
+      GoRoute(path: '/forgot-password', builder: (_, _) => const ForgotPasswordScreen()),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => ResetPasswordScreen(
+          initialToken: state.uri.queryParameters['token'],
+          email: state.uri.queryParameters['email'],
+        ),
+      ),
       GoRoute(path: '/verify-email', builder: (_, _) => const VerifyEmailScreen()),
       GoRoute(path: '/verify-phone', builder: (_, _) => const VerifyPhoneScreen()),
       GoRoute(path: '/verified', builder: (_, _) => const VerifiedScreen()),
@@ -65,19 +91,72 @@ GoRouter createRouter(AuthController auth) {
       GoRoute(
         path: '/needs/new',
         builder: (context, state) {
-          final asset = state.uri.queryParameters['asset'] ?? 'VEHICLE';
+          final asset = state.uri.queryParameters['asset'];
           return NewNeedFlowScreen(
-            initialAssetType: asset == 'PROPERTY' ? 'PROPERTY' : 'VEHICLE',
+            initialAssetType: asset == 'PROPERTY' || asset == 'VEHICLE' ? asset : null,
           );
         },
       ),
       GoRoute(
+        path: '/needs/browse',
+        builder: (_, _) => const BrowseNeedsScreen(),
+      ),
+      GoRoute(
+        path: '/needs/:id/edit',
+        builder: (context, state) => EditNeedScreen(
+          needId: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
         path: '/inventory/new',
-        builder: (_, _) => const AddInventoryScreen(),
+        builder: (context, state) => AddInventoryScreen(
+          returnResult: state.uri.queryParameters['returnResult'] == '1',
+        ),
       ),
       GoRoute(
         path: '/leads',
         builder: (_, _) => const SellerLeadsScreen(showBack: true),
+      ),
+      GoRoute(
+        path: '/leads/:id',
+        builder: (context, state) => LeadDetailScreen(
+          leadId: state.pathParameters['id']!,
+        ),
+      ),
+      GoRoute(
+        path: '/alerts',
+        builder: (context, state) => SellerAlertsScreen(
+          showBack: true,
+          inventoryItemId: state.uri.queryParameters['inventoryItemId'],
+        ),
+      ),
+      GoRoute(
+        path: '/contacts',
+        builder: (_, _) => const BuyerContactsScreen(),
+      ),
+      GoRoute(
+        path: '/contacts/purchasers',
+        builder: (_, _) => const ContactPurchasersScreen(),
+      ),
+      GoRoute(
+        path: '/disputes',
+        builder: (_, _) => const DisputesScreen(),
+      ),
+      GoRoute(
+        path: '/disputes/:id',
+        builder: (context, state) => DisputeDetailScreen(
+          id: state.pathParameters['id'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, _) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: '/wallet',
+        builder: (_, _) => const Scaffold(
+          body: WalletScreen(showBack: true),
+        ),
       ),
       GoRoute(
         path: '/profile',
@@ -100,6 +179,10 @@ GoRouter createRouter(AuthController auth) {
         builder: (_, _) => const ChangePasswordScreen(),
       ),
       GoRoute(
+        path: '/profile/reviews',
+        builder: (_, _) => const MyReviewsScreen(),
+      ),
+      GoRoute(
         path: '/matches/:id/unlocked',
         builder: (context, state) {
           final id = state.pathParameters['id'] ?? '';
@@ -116,9 +199,10 @@ GoRouter createRouter(AuthController auth) {
 }
 
 class WantiApp extends StatefulWidget {
-  const WantiApp({super.key, required this.auth});
+  const WantiApp({super.key, required this.auth, this.push});
 
   final AuthController auth;
+  final PushService? push;
 
   @override
   State<WantiApp> createState() => _WantiAppState();
@@ -126,6 +210,17 @@ class WantiApp extends StatefulWidget {
 
 class _WantiAppState extends State<WantiApp> {
   late final GoRouter _router = createRouter(widget.auth);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.push?.onNotificationOpened = (data) {
+      final route = PushService.routeForPayload(data);
+      if (route != null) {
+        _router.go(route);
+      }
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
